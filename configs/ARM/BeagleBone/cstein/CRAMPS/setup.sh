@@ -84,10 +84,22 @@ sudo $(which config-cape-universal) -f - <<- EOF
 	P8.13	low	# X Step
 	P8.14	low	# Y Dir
 	P8.15	low	# Y Step
-	P8.16	low	# eMMC Enable
+	P8.16	high	# eMMC Enable
 	P8.17	in	# ESTOP
 	P8.18	low	# Z Dir
 	P8.19	low	# Z Step
+
+# Currently broken, requires a universal device overlay for the eMMC pins
+# and updates to the config-cape-universal script.  For now, manually 
+# export pins (see bottom of script)
+#
+# eMMC signals, uncomment *ONLY* if you have disabled the on-board eMMC!
+# MachineKit images disable eMMC and HDMI audio by default in uEnv.txt:
+#  capemgr.disable_partno=BB-BONELT-HDMI,BB-BONE-EMMC-2G
+#	P8.22	low	# Servo 4
+#	P8.23	low	# Servo 3
+#	P8.24	low	# Servo 2
+#	P8.25	low	# Servo 1
 
 	P8.26	high	# ESTOP Out
 
@@ -119,3 +131,10 @@ sudo $(which config-cape-universal) -f - <<- EOF
 	P9.42	low	# SPI CS1
 	P9.92	in	# Reserved, connected to P9.42
 EOF
+
+# Manually export eMMC pins
+for PIN in 32 33 36 37 ; do
+	[ -d /sys/class/gpio/gpio$PIN ] || \
+	sudo su -c "echo $PIN > /sys/class/gpio/export"
+	sudo su -c "echo low  > /sys/class/gpio/gpio$PIN/direction"
+done
