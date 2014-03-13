@@ -46,6 +46,7 @@ static const double L = 250;
 static const double mechanical_advantage = 7.71751169787;
 
 static const double y_offset = 37.5;
+static const double square_z = 76.97;
 
 int kinematicsForward(const double *joints,
 		      EmcPose * pos,
@@ -53,15 +54,15 @@ int kinematicsForward(const double *joints,
 		      KINEMATICS_INVERSE_FLAGS * iflags)
 {
 /* No forward kinematics for Wally yet! */
-//    pos->tran.x = joints[0];
-//    pos->tran.y = joints[1];
-//    pos->tran.z = joints[2];
-//    pos->a = joints[3];
-//    pos->b = joints[4];
-//    pos->c = joints[5];
-//    pos->u = joints[6];
-//    pos->v = joints[7];
-//    pos->w = joints[8];
+    pos->tran.x = 0;
+    pos->tran.y = -160.217802866;
+    pos->tran.z = joints[2];
+    pos->a = joints[3];
+    pos->b = joints[4];
+    pos->c = joints[5];
+    pos->u = joints[6];
+    pos->v = joints[7];
+    pos->w = joints[8];
 
     return 0;
 }
@@ -69,13 +70,22 @@ int kinematicsForward(const double *joints,
 world2ref(double *joints)
 {
     // actual2reference in wally segmentize.py
-    // Account for bed movement in Y based on Z value due to
-    // swing-arm mount of print bed
 
+    double bed_offset_z;
+    double bed_offset_y;
+
+    // Account for non-linear Z access
     // noop for now
 
+    // Offset Y based on bed Z level
+// No Z compensation for now...
+//    bed_offset_z = joints[2] - square_z;
+//    bed_offset_y = sqrt( (l * l) - (bed_offset_z * bed_offset_z) );
+    bed_offset_y = l;
+
     joints[0] = joints[0] + L / 2;
-    joints[1] = joints[1] + y_offset;
+    joints[1] = joints[1] + y_offset - bed_offset_y;
+//    joints[2] = zero_z - z;
 
     return;
 }
@@ -155,33 +165,10 @@ int kinematicsInverse(const EmcPose * pos,
     return 0;
 }
 
-/* implemented for these kinematics as giving joints preference */
-int kinematicsHome(EmcPose * world,
-		   double *joint,
-		   KINEMATICS_FORWARD_FLAGS * fflags,
-		   KINEMATICS_INVERSE_FLAGS * iflags)
-{
-    *fflags = 0;
-    *iflags = 0;
-
-    joint[0] = 0;
-    joint[1] = 0;
-    joint[2] = 0;
-
-    world->tran.x = joint[0];
-    world->tran.y = sqrt( ( (2 * l) * (2 * l) ) - ( (L / 2) * (L / 2) ) ) - y_offset;
-    world->tran.z = joint[2];
-    world->a = joint[3];
-    world->b = joint[4];
-    world->c = joint[5];
-    world->u = joint[6];
-    world->v = joint[7];
-    world->w = joint[8];
-}
-
 KINEMATICS_TYPE kinematicsType()
 {
     return KINEMATICS_INVERSE_ONLY;
+    //return KINEMATICS_BOTH;
 }
 
 #include "rtapi.h"		/* RTAPI realtime OS API */
@@ -191,7 +178,6 @@ KINEMATICS_TYPE kinematicsType()
 EXPORT_SYMBOL(kinematicsType);
 EXPORT_SYMBOL(kinematicsForward);
 EXPORT_SYMBOL(kinematicsInverse);
-EXPORT_SYMBOL(kinematicsHome);
 MODULE_LICENSE("GPL");
 
 int comp_id;
