@@ -51,4 +51,3 @@ assert h['inout'] == 816
 # the signals should be unlinked
 #cmd("halcmd show")
 
-

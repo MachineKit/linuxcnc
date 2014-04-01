@@ -1,3 +1,51 @@
+ver. 1.1
+- this is the "final" version, ready to be included in a release candidate
+  I did not change anything related to the last push, but after 1.10.2, I 
+  made a mistake with the release number, this push correct the error.
+
+ver. 1.0.3.2
+- includes version number also in settings page as label in the botton button bar
+
+ver. 1.0.3.1
+- previous changes to NO_FORCE_HOMING resulted in automatic starting from
+  line if a line has been selected in preview, I changed that so the line
+  is just presetted, but not taken in care if run is pressed. The other way
+  was to dangerous.
+
+ver. 1.0.3
+- solved some bugs in NO_FORCE_HOMING not handled the correct way
+  with start button and mode changes after setup page
+- get rid of hal_toggleaction_run and hal_action_stop, as the run widget
+  caused one of the problems
+
+ver. 1.0.2.1
+- spindle feedback bar changes will not effect any more the
+  speed label value. It was doble information and at the same
+  time confusing for users. The spindle feedback bar will 
+  indicate the real spindle speed and the feed label will show 
+  the programmed value.
+
+ver. 1.0.2
+- solved a bug in getting active gcodes, because I took also the first 
+  element of linuxcnc.stat.gcodes, but that seems not to be a gcode, but 
+  some kind of control number or something like that, so it causes wrong 
+  code and changed gmoccapy behavior in an erroneous way
+- In this bug finding I also needed to change the gladevcp widget combiDRO
+  to get the correct results
+
+ver. 1.0.10.2
+- solved a smal bug with _set_spindle in auto mode
+
+ver. 1.0.10.1
+- gremlin mouse button mode has not been initialized at start up
+
+ver. 1.0.10
+- changed the behavior of the spindle feedback bar and the speed labels
+  we do not change the bar limits from negative to positive, we use
+  from now on only abs values! That is the reason I did include a additional 
+  abs in the postgui hal file
+- corrected an error, not allowing to switch spindle on / off while program paused
+
 ver. 1.0.9
 - the ignore limits has not been called, due to a missing signal from the
   glade file, also the checkbox was hidden if machine off, so it could
