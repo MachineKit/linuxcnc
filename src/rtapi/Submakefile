@@ -61,11 +61,13 @@ XXAPI_COMMON_SRCS := \
 	rtapi_exception.c \
 	$(THREADS_SOURCE).c
 
-# rtapi_compat needs to know where rtapi.ini lives
+# rtapi_compat needs to know where the rtlib base dir and rtapi.ini lives
 %/rtapi_compat.o:  \
-	EXTRAFLAGS += -DEMC2_SYSTEM_CONFIG_DIR=\"$(EMC2_SYSTEM_CONFIG_DIR)\"
+	EXTRAFLAGS += -DEMC2_SYSTEM_CONFIG_DIR=\"$(EMC2_SYSTEM_CONFIG_DIR)\" \
+		-DEMC2_RTLIB_BASE_DIR=\"$(EMC2_RTLIB_BASE_DIR)\"
 %/rtapi_compat.o:  \
-	EXTRA_CFLAGS += -DEMC2_SYSTEM_CONFIG_DIR=\"$(EMC2_SYSTEM_CONFIG_DIR)\"
+	EXTRA_CFLAGS += -DEMC2_SYSTEM_CONFIG_DIR=\"$(EMC2_SYSTEM_CONFIG_DIR)\" \
+		-DEMC2_RTLIB_BASE_DIR=\"$(EMC2_RTLIB_BASE_DIR)\"
 
 # ULAPI:  ../lib/ulapi$THREADSTYLE.so (TBD)
 #
