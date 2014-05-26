@@ -231,6 +231,18 @@ flavor_ptr flavor_byid(int flavor_id)
     return NULL;
 }
 
+int check_rtapi_lib(char *name)
+{
+    struct stat sb;
+    char val[PATH_MAX];
+
+    snprintf(val, PATH_MAX,
+	"%s/ulapi-%s.so", EMC2_RTLIB_BASE_DIR, name);
+
+    /* check if rtapi lib exists */
+    return (stat(val, &sb) == 0);
+}
+
 flavor_ptr default_flavor(void)
 {
     char *fname = getenv("FLAVOR");
@@ -248,21 +260,33 @@ flavor_ptr default_flavor(void)
 	    }
 	    exit(1);
 	}
-	return flavor;
+	/* make sure corresponding rtapi lib is also present */
+	if (check_rtapi_lib(fname))
+	    return flavor;
+	else
+	    exit(1);
+	}
+
+    if (kernel_is_rtai()) {
+	f = flavor_byid(RTAPI_RTAI_KERNEL_ID); 
+	if (check_rtapi_lib((char *)f->name))
+	    return f;
     }
-
-    /* FIXME
-
-       Need to check whether the flavor is available; e.g.  xenomai
-       kthreads has been built but xenomai userland has not.
-    */
-
-    if (kernel_is_rtai())
-	return flavor_byid(RTAPI_RTAI_KERNEL_ID);
-    if (kernel_is_xenomai())
-	return flavor_byid(RTAPI_XENOMAI_ID);
-    if (kernel_is_rtpreempt())
-	return flavor_byid(RTAPI_RT_PREEMPT_ID);
+    if (kernel_is_xenomai()) {
+	/* check for xenomai_kernel first */
+	f = flavor_byid(RTAPI_XENOMAI_KERNEL_ID); 
+	if (check_rtapi_lib((char *)f->name))
+	    return f;
+	/* else look for userspace */
+	f = flavor_byid(RTAPI_XENOMAI_ID); 
+	if (check_rtapi_lib((char *)f->name))
+	    return f;
+    }
+    if (kernel_is_rtpreempt()) {
+	f = flavor_byid(RTAPI_RT_PREEMPT_ID); 
+	if (check_rtapi_lib((char *)f->name))
+	    return f;
+    }
     return flavor_byid(RTAPI_POSIX_ID);
 }
 
