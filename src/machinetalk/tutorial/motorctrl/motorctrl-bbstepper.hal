@@ -20,7 +20,7 @@ loadrt ddt names=actvel,actacc
 
 # load low-level drivers
 loadrt hal_bb_gpio output_pins=103,105,107,120,128,140,141 input_pins=131,132,133,135,137,138
-loadrt [PRUCONF](DRIVER) prucode=$(LINUXCNC_HOME)/[PRUCONF](PRUBIN) [PRUCONF](CONFIG)
+loadrt [PRUCONF](DRIVER) prucode=$(EMC2_HOME)/[PRUCONF](PRUBIN) [PRUCONF](CONFIG)
 
 addf [PRUCONF](DRIVER).capture-position   servo-thread
 addf bb_gpio.read                         servo-thread
@@ -124,12 +124,17 @@ net stepper.enable <== motorctrl.togglebutton1
 net scope-trigger motorctrl.scope_trigger
 
 
+# -N - remote case, use zeroconf resolution
+loadusr -Wn motorctrl gladevcp -N -E -u motorctrl.py motorctrl.ui
+
+# load scope only now - because all sigs are now defined:
+loadusr halscope
 
 # start the gladevcp version
 
 # use the environment UUID to determine the target instance
 # no -N flag - local case, use IPC sockets, no zeroconf resolution
-loadusr -Wn motorctrl gladevcp -E -u motorctrl.py motorctrl.ui
+#loadusr -Wn motorctrl gladevcp -E -u motorctrl.py motorctrl.ui
 
 # -N - remote case, use zeroconf resolution
 #loadusr -Wn motorctrl gladevcp -N -E -u motorctrl.py motorctrl.ui
