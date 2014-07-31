@@ -1,0 +1,29 @@
+
+newcomp gladevcp
+newpin  gladevcp gladevcp.hal_led1 bit in
+newpin  gladevcp gladevcp.hal_togglebutton1  bit out
+newpin  gladevcp gladevcp.hal_togglebutton1-not  bit out
+ready   gladevcp
+
+# 2. at this stage, the component and its pins exist
+# and could be linked to signals
+
+net toggle gladevcp.hal_togglebutton1 gladevcp.hal_led1
+
+# the gladvcp component is 'dormant' (PID=0) and 'unbound'
+show comp gladevcp
+
+# 3. the rcomp is still lacking a remote actor.
+# start the haltalk process, which will acquire any dormant
+# remote components at this stage (in this case 'gladevcp')
+loadusr -W  haltalk --debug 5
+
+# now start the webtalk proxy, enabling websockets/JSON interaction with haltalk:
+# to exercise, run http://<ip>:8080/rcomp.html
+
+loadusr webtalk  --ini webtalk.ini
+
+# add -N (remote case, use zeroconf resolution) for remote operation:
+loadusr -W  gladevcp -E  gladevcp.ui
+
+# toggle button in gladevcp, see updates in rcomp.html
