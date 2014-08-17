@@ -1,0 +1,94 @@
+WEBTALK_DIR := machinetalk/webtalk
+
+# see https://github.com/somdoron/rfc/blob/master/spec_39.txt
+ZWS_SUPPORT := -DZWS_SUPPORT
+
+# install this so out of tree policy plugins can compile against this
+INCLUDES +=  $(WEBTALK_DIR)
+
+MT_INSTALL_INCS +=  machinetalk/webtalk/webtalk.hh
+
+WEBTALK_SRCS :=  $(addprefix $(WEBTALK_DIR)/, \
+	webtalk_zeroconf.cc 	\
+	webtalk_wsproxy.cc	\
+	webtalk_defaultpolicy.cc	\
+	webtalk_jsonpolicy.cc	\
+	webtalk_plugin.cc	\
+	webtalk_echo.cc 	\
+	webtalk_main.cc)
+
+WEBTALK_CXXFLAGS := 		\
+	$(PROTOBUF_CFLAGS) 	\
+	$(CZMQ_CFLAGS) 		\
+	$(JANSSON_CFLAGS)	\
+	$(LWS_CFLAGS)		\
+	$(SSL_CFLAGS)		\
+	$(UUID_CFLAGS) 		\
+	$(AVAHI_CFLAGS) 	\
+	$(URIPARSER_CFLAGS)	\
+	$(ZWS_SUPPORT)
+
+WEBTALK_LDFLAGS := 		\
+	$(PROTOBUF_LIBS)	\
+	$(CZMQ_LIBS) 		\
+	$(JANSSON_LIBS) 	\
+	$(LWS_LIBS) 		\
+	$(SSL_LIBS) 		\
+	$(UUID_LIBS) 		\
+	$(AVAHI_LIBS) 		\
+	$(URIPARSER_LIBS)	\
+	-lstdc++ 		\
+	-rdynamic -ldl -lz
+
+$(call TOOBJSDEPS, $(WEBTALK_SRCS)) : EXTRAFLAGS += $(WEBTALK_CXXFLAGS)
+
+../bin/webtalk: $(call TOOBJS, $(WEBTALK_SRCS)) \
+	../lib/libmtalk.so.0 \
+	../lib/liblinuxcnc-pb2++.so.0 \
+	../lib/liblinuxcnchal.so.0 \
+	../lib/libmtalk.so.0
+	$(ECHO) Linking $(notdir $@)
+	$(Q)$(CC) -o $@ $^ $(LDFLAGS) $(WEBTALK_LDFLAGS)
+
+USERSRCS += $(WEBTALK_SRCS)
+TARGETS += ../bin/webtalk
+
+
+../include/%.h: ./$(WEBTALK_DIR)/%.h
+	cp $^ $@
+
+../include/%.hh: ./$(WEBTALK_DIR)/%.hh
+	cp $^ $@
+
+
+EXAMPLE_PLUGIN_SRCS := $(addprefix $(WEBTALK_DIR)/, \
+	webtalk_example_policy.cc)
+
+$(call TOOBJSDEPS, $(EXAMPLE_PLUGIN_SRCS)) : EXTRAFLAGS += \
+	$(WEBTALK_CXXFLAGS) \
+	-fpic -Wall -std=c++0x -g
+
+../lib/webtalk/plugins/example.o: $(call TOOBJS, $(EXAMPLE_PLUGIN_SRCS))
+	@mkdir -p $(dir $@)
+	$(ECHO) Linking $(notdir $@)
+	$(Q)$(CC) -o $@ $^ -shared
+
+USERSRCS += $(EXAMPLE_PLUGIN_SRCS)
+TARGETS += ../lib/webtalk/plugins/example.o
+
+
+
+ZWS_PLUGIN_SRCS := $(addprefix $(WEBTALK_DIR)/, \
+	webtalk_zws_policy.cc)
+
+$(call TOOBJSDEPS, $(ZWS_PLUGIN_SRCS)) : EXTRAFLAGS += \
+	$(WEBTALK_CXXFLAGS) \
+	-fpic -Wall -std=c++0x -g
+
+../lib/webtalk/plugins/zws.o: $(call TOOBJS, $(ZWS_PLUGIN_SRCS))
+	@mkdir -p $(dir $@)
+	$(ECHO) Linking $(notdir $@)
+	$(Q)$(CC) -o $@ $^ -shared
+
+USERSRCS += $(ZWS_PLUGIN_SRCS)
+TARGETS += ../lib/webtalk/plugins/zws.o
