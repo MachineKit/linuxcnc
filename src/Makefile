@@ -336,8 +336,10 @@ endif
 # see configure.ac GIT_CONFIG_SHA for the configure-time string
 GIT_BUILD_SHA := $(shell ../scripts/get-git-sha)
 
-# complain if SHA's dont match
+# complain if SHAs don't match
+ifeq ($(BUILD_ALL_FLAVORS),yes)
 $(info $(shell  ../scripts/check-build-vs-configure-sha))
+endif
 
 # Compilation options.	Perhaps some of these should come from Makefile.inc? (CXXFLAGS now does)
 INTEGER_OVERFLOW_FLAGS := $(call cc-option,-fwrapv) $(call cc-option, -fno-strict-overflow)
@@ -614,7 +616,7 @@ TARGETS += ../bin/halshow
 	$(Q)chmod +x $@
 
 # And make userspace depend on $(TARGETS)
-userspace: $(TARGETS)
+userspace: $(TARGETS) $(CYTHON_TARGETS)
 
 ifeq ($(BUILD_PYTHON),yes)
 pythonclean:
@@ -838,7 +840,8 @@ endif
 	$(FILE) $(filter ../lib/%.a ../lib/%.so.0,$(TARGETS)) $(DESTDIR)$(libdir)
 	cp --no-dereference $(filter ../lib/%.so, $(TARGETS)) $(DESTDIR)$(libdir)
 	$(FILE) ../rtlib/ulapi-*.so $(DESTDIR)$(EMC2_RTLIB_BASE_DIR)
-	-ldconfig $(DESTDIR)$(libdir)
+#	# don't run ldconfig under fakeroot (silence dpkg-build warning)
+	-test -n "$$FAKED_MODE" || ldconfig $(DESTDIR)$(libdir)
 	$(FILE) $(HEADERS) $(DESTDIR)$(includedir)/linuxcnc/
 	$(FILE) $(USERPCI_HEADERS) $(DESTDIR)$(includedir)/linuxcnc/userpci
 	$(FILE) $(addprefix ../docs/,$(DOCS)) $(DESTDIR)$(docdir)
@@ -1222,6 +1225,8 @@ obj-$(CONFIG_HAL_GPIO) += hal_bb_gpio.o
 hal_bb_gpio-objs := hal/drivers/hal_bb_gpio.o 
 obj-$(CONFIG_PEPPER) += pepper.o
 pepper-objs := hal/components/pepper.o $(MATHSTUB)
+# silence warning about non-byte-aligned struct
+pepper-objs:  EXTRA_FLAGS +=  -Wno-packed-bitfield-compat
 endif
 endif
 
@@ -1426,7 +1431,7 @@ RTDEPS := $(sort $(patsubst $(OBJDIR)/%.o,$(DEPDIR)/%.d, $(RTOBJS)))
 IS_POWERPC = test `uname -m` = ppc -o `uname -m` = ppc64
 modules: $(patsubst %.o,$(RTLIBDIR)/%.so,$(obj-m))
 $(RTLIBDIR)/%.so:
-	$(ECHO) Linking $@
+	$(ECHO) Linking realtime $(threads) $(notdir $@)
 	@mkdir -p $(dir $@)
 	$(Q)ld -r -o $(OBJDIR)/$*.tmp $^
 	@if ! $(IS_POWERPC); then objcopy -j .rtapi_export -O binary \
@@ -1446,7 +1451,7 @@ $(sort $(RTDEPS)): $(DEPDIR)/%.d: %.c
 
 # Rules to make .o (object) files
 $(sort $(RTOBJS)) : $(OBJDIR)/%.o : %.c
-	$(ECHO) Compiling realtime $<
+	$(ECHO) Compiling realtime $(threads) $<
 	@rm -f $@
 	@mkdir -p $(dir $@)
 	$(Q)$(CC) -c $(OPT) $(DEBUG) $(EXTRA_CFLAGS) $< -o $@
@@ -1652,6 +1657,14 @@ cscope:
 cscopeclean:
 	bash -c 'for f in `find ./ -name "cscope.*out"`;do rm $$f;done'
 
-NOSETESTS := $(wildcard ../nosetests/*.py)
-nosetest:
-	$(foreach var,$(NOSETESTS),nosetests -v $(var);)
+nosetests test:
+#	# Set up test command so that it works both with Non-RIP
+#	# builds and when installing to $(DESTDIR) in a package build
+	PYTHONPATH="$(DESTDIR)$(SITEPY)" \
+	LD_LIBRARY_PATH="$(DESTDIR)$(EMC2_RTLIB_DIR):$(DESTDIR)$(libdir)" \
+	MACHINEKIT_INI="$(DESTDIR)$(EMC2_SYSTEM_CONFIG_DIR)/machinekit.ini" \
+	RTAPI_INI="$(DESTDIR)$(EMC2_SYSTEM_CONFIG_DIR)/rtapi.ini" \
+	PATH="$(DESTDIR)$(EMC2_BIN_DIR):$$PATH" \
+	RTLIB_DIR="$(DESTDIR)$(EMC2_RTLIB_BASE_DIR)" \
+	DESTDIR="$(DESTDIR)" \
+	python ../nosetests/run_tests.py

@@ -44,11 +44,14 @@ cdef class Signal:
                 if r:
                     raise RuntimeError("Failed to link pin %s to %s: %s" % (p, self._sig.name, hal_lasterror()))
 
-    def delete(self):
-        # this will cause a handle mismatch if later operating on a deleted signal wrapper
-        r = hal_signal_delete(self._sig.name)
+    @classmethod
+    def delete(cls,name):
+        # this will cause a handle mismatch if later operating on a
+        # deleted signal wrapper
+        r = hal_signal_delete(name)
         if (r < 0):
-            raise RuntimeError("Fail to delete signal %s: %s" % (self._name, hal_lasterror()))
+            raise RuntimeError("Fail to delete signal %s: %s" % \
+                                   (name, hal_lasterror()))
 
     def set(self, v):
         self._alive_check()
@@ -126,6 +129,8 @@ cdef class Signal:
             self._alive_check()
             return self._sig.handle
 
+    def __repr__(self):
+        return "<hal.Signal %s>" % self.name
 
 cdef modifier_name(hal_sig_t *sig, int dir):
      cdef hal_pin_t *pin

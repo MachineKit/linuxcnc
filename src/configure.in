@@ -1319,7 +1319,7 @@ test "$with_posix" = check && with_posix=yes
 test "$have_librt" = no && with_posix=no
 AC_MSG_RESULT($with_posix)
 if test "$with_posix" = yes; then
-   POSIX_THREADS_LDFLAGS="-lpthread -lrt"
+   POSIX_THREADS_LDFLAGS="-lpthread"
    POSIX_THREADS_RTFLAGS="$POSIX_THREADS_RTFLAGS -pthread"
    BUILD_THREAD_FLAVORS="$BUILD_THREAD_FLAVORS posix"
 fi
@@ -1329,7 +1329,7 @@ test "$with_rt_preempt" = check && with_rt_preempt=yes
 test "$have_librt" = no && with_rt_preempt=no
 AC_MSG_RESULT($with_rt_preempt)
 if test "$with_rt_preempt" = yes; then
-    RT_PREEMPT_THREADS_LDFLAGS="-lpthread -lrt"
+    RT_PREEMPT_THREADS_LDFLAGS="-lpthread"
     RT_PREEMPT_THREADS_RTFLAGS="$RT_PREEMPT_THREADS_RTFLAGS -pthread"
     BUILD_THREAD_FLAVORS="$BUILD_THREAD_FLAVORS rt-preempt"
     with_userland_rt_threads=yes
@@ -1420,7 +1420,8 @@ if test -n "$XENOMAI_THREADS_RTS"; then
         flags="$flags -fno-stack-protector"
     fi
     XENOMAI_THREADS_RTFLAGS="$XENOMAI_THREADS_RTFLAGS $flags"
-    XENOMAI_KERNEL_THREADS_RTFLAGS="$XENOMAI_KERNEL_THREADS_RTFLAGS -g $flags"
+    XENOMAI_KERNEL_THREADS_RTFLAGS="$XENOMAI_KERNEL_THREADS_RTFLAGS \
+        -g $flags  -Wno-deprecated-declarations"
     # xenomai kernel math options
     flags="-ffast-math -mhard-float"
     if test "$($XENOMAI_THREADS_RTS --arch)" = x86; then
@@ -2835,7 +2836,7 @@ fi
 if test "x$HAVE_XAW" = "xno"; then
     AC_MSG_WARN([Xaw lib missing, you won't be able to build/run xemc. try installing it with 'apt-get install libxaw7-dev'])
 else    
-    XAW_LIBS="$X_PRE_LIBS $X_LIBS -lX11 -lXaw -lXt"
+    XAW_LIBS="-lX11 -lXaw -lXt"
 fi
 AC_SUBST([HAVE_XAW])
 AC_SUBST([XAW_LIBS])
@@ -3124,8 +3125,6 @@ if test "$BUILD_EMCWEB" = yes; then
    # these are needed for the emcweb interface only
    m4_include([m4/ax_boost_base.m4])
    AX_BOOST_BASE(1.34, , [AC_MSG_ERROR([Boost 1.34.0 or newer required])])
-   m4_include([m4/ax_boost_serialization.m4])
-   AX_BOOST_SERIALIZATION()
    m4_include([m4/ax_boost_thread.m4])
    AX_BOOST_THREAD()
    m4_include([m4/ax_boost_system.m4])
@@ -3227,7 +3226,7 @@ echo "#   Before running the software, set the environment:                #"
 echo "#         . (top dir)/scripts/rip-environment                        #"
 else
 bold
-echo "#   warning: If you already have an installed linuxcnc, this will    #"
+echo "#   caution: If you already have an installed linuxcnc, this will    #"
 echo "#         replace an existing installation.  If you have installed   #"
 echo "#         a linuxcnc package, this will damage the package.          #"
 offbold
