@@ -152,6 +152,7 @@ usr/share/man/man1/halstreamer.1
 usr/share/man/man1/haltcl.1
 usr/share/man/man1/io.1
 usr/share/man/man1/iocontrol.1
+usr/share/man/man1/linuxcnc.1
 usr/share/man/man1/pyvcp.1
 usr/share/man/man1/shuttlexpress.1
 usr/share/man/man1/vfdb_vfd.1

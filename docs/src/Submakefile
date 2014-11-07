@@ -24,6 +24,9 @@ $(DOC_DIR)/man/index.db: $(MAN_SRCS)
 	$(Q)$(MANDB) $(DOC_DIR)/man
 endif
 
+../docs/man/man1/linuxcnc.1: ../docs/src/man/man1/linuxcnc.1.in config.status
+	./config.status --file=$@:$<
+
 ifeq ($(BUILD_DOCS),yes)
 DOC_SRCS_EN := \
 	code/Code_Notes.txt \
@@ -361,9 +364,6 @@ endif
 
 docs: ../docs/man/man1/linuxcnc.1
 
-../docs/man/man1/linuxcnc.1: ../docs/src/man/man1/linuxcnc.1.in config.status
-	./config.status --file=$@:$<
-
 ifeq ($(BUILD_DOCS_PDF),yes)
 docs: pdfdocs
 install-doc: install-doc-pdf
@@ -601,9 +601,9 @@ install-doc-html:
 	cp -a $(DOC_DIR)/html $(DESTDIR)$(docdir)
 install-kernel-indep: install-doc
 else
-docs:
-	$(ECHO) Cannot build documents, missing AsciiDoc or some other required program, or explicitly disabled in configure
+docs: ../docs/man/man1/linuxcnc.1
 
+default: docs
 endif
 
 docclean:
