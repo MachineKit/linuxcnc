@@ -14,7 +14,6 @@ usr/lib/libmtalk.so.0
 usr/lib/libposemath.so.0
 usr/lib/libpyplugin.so.0
 usr/lib/librs274.so.0
-usr/lib/tcltk/linuxcnc
 usr/bin/5axisgui
 usr/bin/classicladder
 usr/bin/configserver

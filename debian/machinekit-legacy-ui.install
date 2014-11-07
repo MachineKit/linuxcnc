@@ -37,6 +37,7 @@ usr/lib/python*/*/gremlin_view.py
 usr/lib/python*/*/gmoccapy
 usr/lib/python*/*/gscreen
 usr/lib/python*/*/touchy
+usr/lib/tcltk/linuxcnc
 usr/share/locale/*/LC_MESSAGES/gmoccapy.mo
 usr/share/man/man1/axis-remote.1
 usr/share/man/man1/axis.1
