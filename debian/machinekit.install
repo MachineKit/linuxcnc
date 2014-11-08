@@ -50,14 +50,12 @@ usr/bin/maho600gui
 usr/bin/max5gui
 usr/bin/mb2hal
 usr/bin/milltask
-usr/bin/ngcgui
 usr/bin/npbdecode
 usr/bin/pncconf
 usr/bin/position
 usr/bin/profile_axis
 usr/bin/puma560gui
 usr/bin/pumagui
-usr/bin/pyngcgui
 usr/bin/pyvcp
 usr/bin/pyvcp_demo
 usr/bin/realtime
@@ -100,7 +98,6 @@ usr/lib/python*/*/pb2json.py
 usr/lib/python*/*/popupkeyboard.py
 usr/lib/python*/*/preview_pb2.py
 usr/lib/python*/*/propertywindow.py
-usr/lib/python*/*/pyngcgui.py
 usr/lib/python*/*/pyvcp_widgets.py
 usr/lib/python*/*/rtapi_message_pb2.py
 usr/lib/python*/*/rtapicommand_pb2.py
