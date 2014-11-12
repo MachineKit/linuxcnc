@@ -39,6 +39,7 @@ Package: machinekit
 Breaks: linuxcnc
 Replaces: linuxcnc
 Architecture: any
+Recommends: machinekit-legacy-ui
 Suggests: machinekit-doc-en | machinekit-doc, 
 Depends: ${shlibs:Depends}, machinekit-rt-threads, @TCL_TK_DEPS@,
     bwidget (>= 1.7), libtk-img (>=1.13),
@@ -50,12 +51,42 @@ Depends: ${shlibs:Depends}, machinekit-rt-threads, @TCL_TK_DEPS@,
     python${python-version}-numpy | python-numpy,
     python${python-version}-imaging,
     python${python-version}-imaging-tk | python-imaging-tk,
-    python-gtksourceview2,
-    python-vte,
     python-xlib, python-gtkglext1, python-configobj,
-    python-zmq, python-protobuf, python-gst0.10,
+    python-zmq, python-protobuf,
     tclreadline, bc, procps, psmisc, module-init-tools | kmod
 Description: PC based motion controller for real-time Linux
  Machinekit is the next-generation Enhanced Machine Controller which
  provides motion control for CNC machine tools and robotic
  applications (milling, cutting, routing, etc.).
+
+Package: machinekit-libnml
+Architecture: any
+Depends: ${shlibs:Depends}, machinekit (= ${binary:Version})
+Section: libs
+Description: This is a lean'n'mean replacement for
+ the NIST rcslib. Much of the original code is used, but without the
+ multitude of platform specific macros and sources. This is a linux
+ only implimentation with the ability to communicate with another 
+ computer running the NIST rcslib.
+ .
+ Only shared memory buffers will be supported along with xdr and
+ raw data encoding.
+
+Package: machinekit-libnml-dev
+Architecture: any
+Depends: machinekit-libnml, machinekit-dev (= ${binary:Version})
+Section: libs
+Description: This is a lean'n'mean replacement for
+ the NIST rcslib. Much of the original code is used, but without the
+ multitude of platform specific macros and sources. This is a linux
+ only implimentation with the ability to communicate with another 
+ computer running the NIST rcslib.
+ .
+ Only shared memory buffers will be supported along with xdr and
+ raw data encoding.
+
+Package: machinekit-legacy-ui
+Architecture: any
+Depends: ${shlibs:Depends}, ${python:Depends}, @TCL_TK_DEPS@,
+    python-glade2, python-gtksourceview2, python-vte,  python-gst0.10
+Description: Libnml based user interfaces for machinekit.
