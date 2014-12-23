@@ -82,6 +82,7 @@ include an option for suppressing superfluous commands.
 #include <set>
 #include <stdexcept>
 
+#include "rtapi.h"
 #include "inifile.hh"		// INIFILE
 #include "rs274ngc.hh"
 #include "rs274ngc_return.hh"
@@ -967,8 +968,39 @@ int Interp::init()
 	      n++;
 	  }
 
-          // close it
-          inifile.Close();
+    	// if exist and within parameters, apply ini file arc tolerances
+    	// limiting figures are defined in interp_internal.hh
+    	
+      _setup.tolerance_inch = TOLERANCE_INCH;
+      inifile.Find(&_setup.tolerance_inch, "TOLERANCE_INCH", "RS274NGC");
+	  if( (_setup.tolerance_inch > MAX_TOLERANCE_INCH) )
+	      {
+	      _setup.tolerance_inch = MAX_TOLERANCE_INCH;
+	      rtapi_print_msg(RTAPI_MSG_DBG, "setup.tolerance_inch GT MAX_TOLERANCE_INCH\n");	    
+	      }
+	  else if(_setup.tolerance_inch < TOLERANCE_INCH) 
+	      {
+	      _setup.tolerance_inch = TOLERANCE_INCH;
+	      rtapi_print_msg(RTAPI_MSG_DBG, "setup.tolerance_inch LT TOLERANCE_INCH\n");	    	  
+	      }
+	  rtapi_print_msg(RTAPI_MSG_DBG, "setup.tolerance_inch set to %f\n", _setup.tolerance_inch);
+ 
+      _setup.tolerance_mm = TOLERANCE_MM;
+	  inifile.Find(&_setup.tolerance_mm, "TOLERANCE_MM", "RS274NGC");
+	  if( (_setup.tolerance_mm > MAX_TOLERANCE_MM) )
+	      {
+	      _setup.tolerance_mm = MAX_TOLERANCE_MM;
+	      rtapi_print_msg(RTAPI_MSG_DBG, "setup.tolerance_mm GT MAX_TOLERANCE_MM\n");	    
+	      }
+	  else if(_setup.tolerance_mm < TOLERANCE_MM) 
+	      {
+	      _setup.tolerance_mm = TOLERANCE_MM;
+	      rtapi_print_msg(RTAPI_MSG_DBG, "setup.tolerance_mm LT TOLERANCE_MM\n");	    	  
+	      }
+	  rtapi_print_msg(RTAPI_MSG_DBG, "setup.tolerance_mm set to %f\n", _setup.tolerance_mm);
+
+      // close it
+      inifile.Close();
       }
   }
 
