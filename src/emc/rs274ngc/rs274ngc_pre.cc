@@ -967,8 +967,25 @@ int Interp::init()
 	      n++;
 	  }
 
-          // close it
-          inifile.Close();
+    	// if exist and within parameters, apply ini file arc tolerances
+    	// limiting figures are defined in interp_internal.hh
+    	
+      _setup.tolerance_inch = TOLERANCE_INCH;
+      inifile.Find(&_setup.tolerance_inch, "TOLERANCE_INCH", "RS274NGC");
+	  if( (_setup.tolerance_inch > MAX_TOLERANCE_INCH) )
+	      _setup.tolerance_inch = MAX_TOLERANCE_INCH;
+	  else if(_setup.tolerance_inch < TOLERANCE_INCH) 
+	      _setup.tolerance_inch = TOLERANCE_INCH;
+	   
+      _setup.tolerance_mm = TOLERANCE_MM;
+	  inifile.Find(&_setup.tolerance_mm, "TOLERANCE_MM", "RS274NGC");
+	  if( (_setup.tolerance_mm > MAX_TOLERANCE_MM) )
+	      _setup.tolerance_mm = MAX_TOLERANCE_MM;
+	  else if(_setup.tolerance_mm < TOLERANCE_MM) 
+	      _setup.tolerance_mm = TOLERANCE_MM;
+	  
+      // close it
+      inifile.Close();
       }
   }
 

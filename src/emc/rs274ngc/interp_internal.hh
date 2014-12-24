@@ -60,7 +60,11 @@
 
 /* numerical constants */
 #define TOLERANCE_INCH 0.0005
-#define TOLERANCE_MM 0.005
+#define TOLERANCE_MM 0.0127
+
+#define MAX_TOLERANCE_INCH 0.005
+#define MAX_TOLERANCE_MM 0.127
+
 /* angle threshold for concavity for cutter compensation, in radians */
 #define TOLERANCE_CONCAVE_CORNER 0.05  
 #define TOLERANCE_EQUAL 0.0001 /* two numbers compare EQ if the
@@ -663,6 +667,8 @@ typedef struct setup_struct
   FILE *file_pointer;           // file pointer for open NC code file
   bool flood;                 // whether flood coolant is on
   CANON_UNITS length_units;     // millimeters or inches
+  double tolerance_inch;        // modify with ini setting
+  double tolerance_mm;          // modify with ini setting
   int line_length;              // length of line last read
   char linetext[LINELEN];       // text of most recent line read
   bool mist;                  // whether mist coolant is on
