@@ -1,3 +1,3 @@
 #!/bin/sh
-cp ../../docs/src/hal/rand.comp .
+cp ../../src/hal/components/rand.comp .
 comp --compile rand.comp
