@@ -11,8 +11,6 @@ build-stamp
 *.mod.c
 *.cmd
 .tmp*
-# Except Gcode quick-ref cards (en,de,sp,fr) which are maintained by hand
-!docs/html/gcode*.html
 # Ignore all LyX files, we're done with them now.
 *.lyx
 debian/*.debhelper.log
@@ -21,7 +19,6 @@ share/*/*.desktop
 share/menus/CNC.menu
 share/desktop-directories/cnc.directory
 src/modules.order
-docs/html/drivers
 /configs/*/emc.nml
 !/configs/common/emc.nml
 /man/man1/linuxcnc.1

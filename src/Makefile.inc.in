@@ -1,5 +1,5 @@
 #                                                          -*-makefile-gmake-*-
-# @configure_input@ 
+# @configure_input@
 # on @DATE@
 #
 
@@ -307,9 +307,6 @@ RANLIB = @RANLIB@
 MSGFMT = @MSGFMT@
 XGETTEXT = @XGETTEXT@
 
-BUILD_DOCS = @BUILD_DOCS@
-BUILD_DOCS_PDF = @BUILD_DOCS_PDF@
-BUILD_DOCS_HTML = @BUILD_DOCS_HTML@
 PYTHON = @PYTHON@
 TCLSH = @TCLSH@
 EMC2_TCL_LIB_DIR = @EMC2_TCL_LIB_DIR@
@@ -417,4 +414,3 @@ BOOST_THREAD_LIB=@BOOST_THREAD_LIB@
 BOOST_SYSTEM_LIB=@BOOST_SYSTEM_LIB@
 
 #### END CONFIG ####
-
