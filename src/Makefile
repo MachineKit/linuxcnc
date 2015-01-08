@@ -11,13 +11,13 @@ endif
 
 # A "trivial build" is one which should not include dependency information
 # either because it should be usable before dependency information can be
-# generated or when it is invalid (clean, docclean) or when running as root
+# generated or when it is invalid (clean) or when running as root
 # when the user must guarantee in advance that everything is built
 # (setuid, install)
 ifeq ($(MAKECMDGOALS),)
 TRIVIAL_BUILD=no
 else
-ifeq ($(filter-out docclean clean setuid install tags swish,$(MAKECMDGOALS)),)
+ifeq ($(filter-out clean setuid install tags swish,$(MAKECMDGOALS)),)
 TRIVIAL_BUILD=yes
 else
 TRIVIAL_BUILD=no
@@ -622,7 +622,7 @@ pythonclean:
 	find ../lib/python -name '*.so' -exec rm {} +
 python: $(PYTARGETS)
 userspace: python
-clean: docclean pythonclean cscopeclean
+clean: pythonclean cscopeclean
 endif
 
 # This is the gateway into the crazy world of "kbuild", the linux 2.6 system
