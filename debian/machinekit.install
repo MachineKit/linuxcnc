@@ -21,6 +21,7 @@ usr/share/axis/images/*
 usr/share/axis/tcl/*
 usr/share/glade3
 usr/share/linuxcnc/*
+usr/share/linuxcnc/ncfiles/*
 usr/share/linuxcnc/stepconf/*.glade
 usr/share/locale/*/LC_MESSAGES/*.mo
 usr/share/man/man1/*
