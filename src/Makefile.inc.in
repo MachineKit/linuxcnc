@@ -103,7 +103,6 @@ libdir = @libdir@
 infodir = @infodir@
 mandir = @mandir@
 includedir = @includedir@
-docdir = @docdir@
 sampleconfsdir = ${datadir}/linuxcnc/examples/sample-configs
 ncfilesdir = ${datadir}/linuxcnc/ncfiles
 tcldir = ${prefix}/lib/tcltk/linuxcnc
