@@ -334,8 +334,10 @@ endif
 # see configure.ac GIT_CONFIG_SHA for the configure-time string
 GIT_BUILD_SHA := $(shell ../scripts/get-git-sha)
 
-# complain if SHA's dont match
+# complain if SHAs don't match
+ifeq ($(BUILD_ALL_FLAVORS),yes)
 $(info $(shell  ../scripts/check-build-vs-configure-sha))
+endif
 
 # Compilation options.	Perhaps some of these should come from Makefile.inc? (CXXFLAGS now does)
 INTEGER_OVERFLOW_FLAGS := $(call cc-option,-fwrapv) $(call cc-option, -fno-strict-overflow)
@@ -833,7 +835,8 @@ endif
 	$(FILE) $(filter ../lib/%.a ../lib/%.so.0,$(TARGETS)) $(DESTDIR)$(libdir)
 	cp --no-dereference $(filter ../lib/%.so, $(TARGETS)) $(DESTDIR)$(libdir)
 	$(FILE) ../rtlib/ulapi-*.so $(DESTDIR)$(EMC2_RTLIB_BASE_DIR)
-	-ldconfig $(DESTDIR)$(libdir)
+#	# don't run ldconfig under fakeroot (silence dpkg-build warning)
+	-test -n "$$FAKED_MODE" || ldconfig $(DESTDIR)$(libdir)
 	$(FILE) $(HEADERS) $(DESTDIR)$(includedir)/linuxcnc/
 	$(FILE) $(USERPCI_HEADERS) $(DESTDIR)$(includedir)/linuxcnc/userpci
 	$(FILE) $(DOCS_HELP) $(DESTDIR)$(docdir)
@@ -1217,6 +1220,8 @@ obj-$(CONFIG_HAL_GPIO) += hal_bb_gpio.o
 hal_bb_gpio-objs := hal/drivers/hal_bb_gpio.o
 obj-$(CONFIG_PEPPER) += pepper.o
 pepper-objs := hal/components/pepper.o $(MATHSTUB)
+# silence warning about non-byte-aligned struct
+pepper-objs:  EXTRA_FLAGS +=  -Wno-packed-bitfield-compat
 endif
 
 obj-m += hal_arm335xQEP.o
@@ -1429,7 +1434,7 @@ RTDEPS := $(sort $(patsubst $(OBJDIR)/%.o,$(DEPDIR)/%.d, $(RTOBJS)))
 IS_POWERPC = test `uname -m` = ppc -o `uname -m` = ppc64
 modules: $(patsubst %.o,$(RTLIBDIR)/%.so,$(obj-m))
 $(RTLIBDIR)/%.so:
-	$(ECHO) Linking $@
+	$(ECHO) Linking realtime $(threads) $(notdir $@)
 	@mkdir -p $(dir $@)
 	$(Q)ld -r -o $(OBJDIR)/$*.tmp $^
 	@if ! $(IS_POWERPC); then objcopy -j .rtapi_export -O binary \
@@ -1449,7 +1454,7 @@ $(sort $(RTDEPS)): $(DEPDIR)/%.d: %.c
 
 # Rules to make .o (object) files
 $(sort $(RTOBJS)) : $(OBJDIR)/%.o : %.c
-	$(ECHO) Compiling realtime $<
+	$(ECHO) Compiling realtime $(threads) $<
 	@rm -f $@
 	@mkdir -p $(dir $@)
 	$(Q)$(CC) -c $(OPT) $(DEBUG) $(EXTRA_CFLAGS) $< -o $@

@@ -132,8 +132,9 @@ static void z_shutdown(void)
     fprintf(stderr, "preview: socket shutdown\n");
     if (n_containers > 0)
     {
-        fprintf(stderr, "preview: %zu containers %zu preview msgs %zu bytes  avg=%d bytes/container\n",
-            n_containers, n_messages, n_bytes, n_bytes/n_containers);
+        fprintf(stderr, "preview: %zu containers %zu preview msgs %zu bytes  "
+		"avg=%zu bytes/container\n",
+		n_containers, n_messages, n_bytes, n_bytes/n_containers);
     }
     zctx_destroy(&z_context);
 }
@@ -1305,13 +1306,13 @@ static PyObject *bind_sockets(PyObject *self, PyObject *args) {
     if(!PyArg_ParseTuple(args, "ss", &preview_uri, &status_uri))
         return NULL;
     int rc;
-    rc = zsocket_bind(z_preview, preview_uri);
+    rc = zsocket_bind(z_preview, "%s", preview_uri);
     if(!rc) {
 	PyErr_Format(PyExc_RuntimeError,
 		     "binding preview socket to '%s' failed", preview_uri);
 	return NULL;
     }
-    rc = zsocket_bind(z_status, status_uri);
+    rc = zsocket_bind(z_status, "%s", status_uri);
     if(!rc) {
 	PyErr_Format(PyExc_RuntimeError,
 		     "binding status socket to '%s' failed", status_uri);

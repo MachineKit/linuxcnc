@@ -135,7 +135,7 @@ PROTO_CXX_INCS :=
 PROTO_CXX_INCS += $(subst $(PROTODIR)/, \
 	$(PBGEN)/,  \
 	$(patsubst %.proto, %.pb.h, $(PROTO_SPECS)))
-PROTO_CXX_INCS += ../include/machinetalk/generated/nanopb.pb.h
+PROTO_CXX_INCS += machinetalk/generated/nanopb.pb.h
 
 # generated C++ sources
 PROTO_CXX_SRCS  :=  $(PBGEN)/nanopb.pb.cc
@@ -300,7 +300,8 @@ $(PROTOCXXLIB).0: $(patsubst %.cc,objects/%.o,$(PROTO_CXX_SRCS))
 	$(ECHO) Linking $(notdir $@)
 	@mkdir -p ../lib
 	@rm -f $@
-	$(Q)$(CXX) $(LDFLAGS) -Wl,-soname,$(notdir $@) -shared -o $@ $^
+	$(Q)$(CXX) $(LDFLAGS) -Wl,-soname,$(notdir $@) -shared -o $@ $^ \
+		$(PROTOBUF_LIBS)
 
 # protoc generated headers are exported to ../include
 ../include/%.h: ./$(PBGEN)/%.h

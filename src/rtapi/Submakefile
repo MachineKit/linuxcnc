@@ -78,6 +78,9 @@ ULAPI_SRCS := \
 	rtapi/$(threads)/ulapi_main.c
 ifeq ($(BUILD_SYS),kbuild)
 ULAPI_SRCS += rtapi/$(threads)/rtapi_module.c
+else
+# only userland ulapi.so modules need links to the RT libs
+ULAPISO_RT_LDFLAGS = $(RT_LDFLAGS)
 endif
 
 # resolved at loadtime
@@ -88,11 +91,11 @@ ULAPISO := ../rtlib/ulapi-$(threads).so
 
 $(ULAPISO): ../lib/liblinuxcnchal.so ../lib/liblinuxcncshm.so \
 		$(call TOOBJS, $(ULAPI_SRCS))
-	$(ECHO) Creating shared object $@
+	$(ECHO) Creating shared object $(notdir $@)
 	@mkdir -p ../rtlib
 	@rm -f $@
 	$(Q)$(CC) $(LDFLAGS)  -Wl,-soname,$(notdir $@) -shared \
-	    -o $@ $^ $(ULAPISO_LIBS) $(RT_LDFLAGS) \
+	    -o $@ $^ $(ULAPISO_LIBS) $(ULAPISO_RT_LDFLAGS) \
 	../lib/liblinuxcncshm.so \
 	../lib/liblinuxcnchal.so
 
@@ -170,8 +173,8 @@ $(call TOOBJSDEPS, rtapi/$(threads)/rtapi_app.cc): EXTRAFLAGS = \
 	$(ECHO) Linking $(notdir $@)
 	@mkdir -p $(dir $@)
 	$(Q)$(CXX) -Wl,-rpath,$(EMC2_RTLIB_DIR) $(RTAPI_APP_RPATH) \
-	    -o $@ $^ $(RT_LDFLAGS) \
-	$(PROTOBUF_LIBS) $(CZMQ_LIBS) $(AVAHI_LIBS) -lstdc++ -ldl -luuid
+	    -o $@ $^ \
+	    $(PROTOBUF_LIBS) $(CZMQ_LIBS) -lstdc++ -ldl -luuid
 
 #	$(LIBBACKTRACE) # already linked into libmtalk
 
@@ -266,7 +269,7 @@ RTAPI_MSGD_CFLAGS := \
 
 RTAPI_MSGD_LDFLAGS := \
 	$(PROTOBUF_LIBS) $(CZMQ_LIBS) $(AVAHI_LIBS) \
-	-lstdc++ -ldl -lz -luuid
+	-lstdc++ -ldl -luuid
 
 #	$(LIBBACKTRACE) # already linked into libmtalk
 
