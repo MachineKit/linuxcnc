@@ -1,0 +1,55 @@
+.TH LINCURVE "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+lincurve \- one-dimensional lookup table
+.SH SYNOPSIS
+.HP
+.B loadrt lincurve [count=\fIN\fB|names=\fIname1\fB[,\fIname2...\fB]] [personality=\fIP,P,...\fB]
+.SH DESCRIPTION
+
+Performs a 1-dimensional lookup and interpolation. The x-val
+parameters must be monotonic, though identical adjacent values are allowed.
+(for example 0,0,0,10) for a 4-element curve. 
+
+For input values less than the x-val-00 breakpoint the y-val-00 is returned. 
+For x greater than the largest x-val-NN the yval corresponding to x-max is
+returned (ie, no extrapolation is performed.)
+
+Sample usage: loadrt lincurve count=3 personality=4,4,4 
+for a set of three 4-element curves.
+
+The axis breakpoints should be set in the lincurve.N.x-val-NN parameters using
+"setp", as should the corresponding y values. 
+.SH FUNCTIONS
+.TP
+\fBlincurve.\fIN\fB\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B lincurve.\fIN\fB.in\fR float in \fR
+The input value
+.TP
+.B lincurve.\fIN\fB.out\fR float out \fR
+The output value
+.TP
+.B lincurve.\fIN\fB.out-io\fR float io \fR
+The output value, compatible with PID gains
+.SH PARAMETERS
+.TP
+.B lincurve.\fIN\fB.x-val-\fIMM\fB\fR float rw  (MM=00..personality) \fR
+axis breakpoints
+.TP
+.B lincurve.\fIN\fB.y-val-\fIMM\fB\fR float rw  (MM=00..personality) \fR
+output values to be interpolated
+.SH AUTHOR
+
+Andy Pugh
+.SH LICENSE
+
+GPL

@@ -1,0 +1,33 @@
+.TH ESTOP_LATCH "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+estop_latch \- ESTOP latch which sets ok-out true and fault-out false only if ok-in is true, fault-in is false, and a rising edge is seen on reset.  While ok-out is true, watchdog toggles, and can be used for chargepumps or similar needs.
+.SH SYNOPSIS
+.HP
+.B loadrt estop_latch [count=\fIN\fB|names=\fIname1\fB[,\fIname2...\fB]]
+.SH FUNCTIONS
+.TP
+\fBestop-latch.\fIN\fB\fR
+
+.SH PINS
+.TP
+.B estop-latch.\fIN\fB.ok-in\fR bit in \fR
+.TQ
+.B estop-latch.\fIN\fB.fault-in\fR bit in \fR
+.TQ
+.B estop-latch.\fIN\fB.reset\fR bit in \fR
+.TQ
+.B estop-latch.\fIN\fB.ok-out\fR bit out \fR
+.TQ
+.B estop-latch.\fIN\fB.fault-out\fR bit out \fR
+.TQ
+.B estop-latch.\fIN\fB.watchdog\fR bit out \fR
+.SH LICENSE
+
+GPL

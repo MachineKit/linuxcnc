@@ -1,0 +1,27 @@
+.TH REMOTE "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+remote
+.SH SYNOPSIS
+.HP
+.B loadrt remote
+.SH FUNCTIONS
+.TP
+\fBremote\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B remote.to-remote\fR float in \fR
+a value passed to a remote HAL component
+.TP
+.B remote.from-remote\fR float in \fR
+a value updated by a remote HAL component
+.SH LICENSE
+
+GPLv2 or later

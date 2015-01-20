@@ -1,0 +1,162 @@
+.TH PLUTO_STEP "9" "2014-11-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+pluto_step \- Hardware driver and firmware for the Pluto-P parallel-port FPGA, for use with stepper machines.
+.SH SYNOPSIS
+
+.B loadrt pluto_step ioaddr=\fIaddr\fB ioaddr_hi=\fIaddr\fB epp_wide=\fI[0|1]\fB
+
+.RS 4
+.TP
+\fBioaddr\fR [default: 0x378]
+The base address of the parallel port.
+
+.TP
+\fBioaddr_hi\fR [default: 0]
+The secondary address of the parallel port, used to set EPP
+mode.  0 means to use ioaddr + 0x400.  -1 means there is no
+secondary address.
+
+.TP
+\fBepp_wide\fR [default: 1]
+Set to zero to disable "wide EPP mode".  "Wide" mode allows 16- and 32-bit EPP
+transfers, which can reduce the time spent in the read and write functions.
+However, this mode may not work on all EPP parallel ports.
+
+.TP
+\fBwatchdog\fR [default: 1]
+Set to zero to disable the "hardware watchdog".  "Watchdog" will tristate all
+outputs approximately 6ms after the last execution of
+\fBpluto-step.write\fR, which adds some protection in the case of LinuxCNC
+crashes.
+
+.TP
+\fBspeedrange\fR [default: 0]
+Selects one of four speed ranges:
+.RS
+.RS 4
+.TQ
+0: Top speed 312.5kHz; minimum speed 610Hz
+.TQ
+1: Top speed 156.25kHz; minimum speed 305Hz
+.TQ
+2: Top speed 78.125kHz; minimum speed 153Hz
+.TQ
+3: Top speed 39.06kHz; minimum speed 76Hz
+.RE
+Choosing the smallest maximum speed that is above the maximum for any one axis
+may give improved step regularity at low step speeds.
+.RE
+.RE
+.SH DESCRIPTION
+
+
+Pluto_step is a LinuxCNC software driver and associated firmware that allow the Pluto-P board to be used to control a stepper-based CNC machine.
+
+The driver has 4 step+direction channels, 14 dedicated digital outputs, and 16
+dedicated digital inputs.
+
+.SS Step generators
+The step generator takes a position input and output.
+
+The step waveform includes step length/space and direction hold/setup time.
+Step length and direction setup/hold time is enforced in the FPGA.  Step space
+is enforced by a velocity cap in the driver.
+
+\fI(all the following numbers are subject to change)\fR
+In \fIspeedrange=0\fR, the maximum step rate is 312.5kHz.  For position
+feedback to be accurate, the maximum step rate is 512 pulses per servo cycle
+(so a 1kHz servo cycle does not impose any additional limitation).  The maximum
+step rate may be lowered by the step length and space parameters, which are
+rounded up to the nearest multiple of 1600ns.
+
+In successive speedranges the maximum step rate is divided in half, as is the
+maximum steps per servo cycle, and the minimum nonzero step rate.
+
+.SS Digital I/O
+The digital output pins conform to the `canonical digital output' interface
+described in the HAL manual.
+
+The digital input pins conform to the `canonical digital input' interface
+described in the HAL manual.
+
+.SH FUNCTIONS
+.TP
+\fBpluto-step.read\fR (requires a floating-point thread)
+Read all the inputs from the pluto-step board
+.TP
+\fBpluto-step.write\fR (requires a floating-point thread)
+Write all the outputs on the pluto-step board
+.SH PINS
+.TP
+.B pluto-step.stepgen.\fIM\fB.position-cmd\fR float in  (M=0..3) \fR
+.TQ
+.B pluto-step.stepgen.\fIM\fB.velocity-fb\fR float out  (M=0..3) \fR
+.TQ
+.B pluto-step.stepgen.\fIM\fB.position-fb\fR float out  (M=0..3) \fR
+.TQ
+.B pluto-step.stepgen.\fIM\fB.counts\fR s32 out  (M=0..3) \fR
+.TQ
+.B pluto-step.stepgen.\fIM\fB.enable\fR bit in  (M=0..3) \fR
+.TQ
+.B pluto-step.stepgen.\fIM\fB.reset\fR bit in  (M=0..3) \fR
+When TRUE, reset position-fb to 0
+.TP
+.B pluto-step.dout.\fIMM\fB\fR bit in  (MM=00..13) \fR
+dout.\fIMM\fR corresponds to the pin labeled
+OUT\fIM\fR on the pinout diagram.
+.TP
+.B pluto-step.din.\fIMM\fB\fR bit out  (MM=00..15) \fR
+.TQ
+.B pluto-step.din.\fIMM\fB-not\fR bit out  (MM=00..15) \fR
+din.\fIMM\fR corresponds to the pin labeled
+IN\fIM\fR on the pinout diagram.
+.SH PARAMETERS
+.TP
+.B pluto-step.stepgen.\fIM\fB.scale\fR float rw  (M=0..3) \fR(default: \fI1.0\fR)
+.TQ
+.B pluto-step.stepgen.\fIM\fB.maxvel\fR float rw  (M=0..3) \fR(default: \fI0\fR)
+.TQ
+.B pluto-step.stepgen.step-polarity\fR bit rw \fR
+.TQ
+.B pluto-step.stepgen.steplen\fR u32 rw \fR
+Step length in ns.
+.TP
+.B pluto-step.stepgen.stepspace\fR u32 rw \fR
+Step space in ns
+.TP
+.B pluto-step.stepgen.dirtime\fR u32 rw \fR
+Dir hold/setup in ns.  Refer to the pdf documentation for a diagram of what these timings mean.
+.TP
+.B pluto-step.dout.\fIMM\fB-invert\fR bit rw  (MM=00..13) \fR
+If TRUE, the output on the corresponding \fBdout.\fIMM\fR is inverted.
+.TP
+.B pluto-step.communication-error\fR u32 rw \fR
+Incremented each time 
+pluto-step.read detects an error code in the EPP status register.  While
+this register is nonzero, new values are not being written to the Pluto-P
+board, and the status of digital outputs and the PWM duty cycle of the PWM
+outputs will remain unchanged.  If the hardware watchdog is enabled, it will
+activate shortly after the communication error is detected by LinuxCNC.  To continue
+after a communication error, set this parameter back to zero.
+.TP
+.B pluto-step.debug-0\fR s32 rw \fR
+.TQ
+.B pluto-step.debug-1\fR s32 rw \fR
+.TQ
+.B pluto-step.debug-2\fR float rw \fR(default: \fI.5\fR)
+.TQ
+.B pluto-step.debug-3\fR float rw \fR(default: \fI2.0\fR)
+Registers that hold debugging information of interest to developers
+.SH SEE ALSO
+
+The \fIpluto_step\fR section in the HAL User Manual, which shows the location of each physical pin on the pluto board.
+.SH LICENSE
+
+GPL

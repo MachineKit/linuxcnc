@@ -1,0 +1,211 @@
+.TH PLUTO_SERVO "9" "2014-11-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+pluto_servo \- Hardware driver and firmware for the Pluto-P parallel-port FPGA, for use with servo machines.
+.SH SYNOPSIS
+.HP
+.B loadrt pluto_servo [ioaddr=\fIN\fB] [ioaddr_hi=\fIN\fB] [epp_wide=\fIN\fB] [watchdog=\fIN\fB] [test_encoder=\fIN\fB]
+.RS 4
+.TP
+\fBioaddr\fR [default: 0x378]
+The base address of the parallel port.
+.TP
+\fBioaddr_hi\fR [default: 0]
+The secondary address of the parallel port, used to set EPP
+mode.  0 means to use ioaddr + 0x400.  -1 means there is no
+secondary address.  The secondary address is used to set the port to EPP
+mode.
+.TP
+\fBepp_wide\fR [default: 1]
+Set to zero to disable the "wide EPP mode".  "Wide" mode allows a 16-
+and 32-bit EPP transfers, which can reduce the time spent in the read and write
+functions.  However, this may not work on all EPP parallel ports.
+.TP
+\fBwatchdog\fR [default: 1]
+Set to zero to disable the "hardware watchdog".  "Watchdog" will
+tristate all outputs approximately 6ms after the last execution of
+\fBpluto-servo.write\fR, which adds some protection in the case of LinuxCNC
+crashes.
+.TP
+\fBtest_encoder\fR [default: 0]
+Internally connect dout0..2 to QA0, QB0, QZ0 to test quadrature counting
+.RE
+.SH DESCRIPTION
+
+
+Pluto_servo is a LinuxCNC software driver and associated firmware that allow the Pluto-P board to be used to control a servo-based CNC machine.
+
+The driver has 4 PWM channels, 4 quadrature channels with index pulse, 18
+digital outputs (8 shared with PWM), and 20 digital inputs (12 shared with
+quadrature).
+
+.SS Encoders
+The encoder pins and parameters conform to the `canonical encoder' interface
+described in the HAL manual.  It operates in `x4 mode'.
+
+The sample rate of the encoder is 40MHz.  The maximum number quadrature rate is
+8191 counts per LinuxCNC servo cycle.  For correct handling of the index pulse, the
+number of encoder counts per revolution must be less than 8191.
+
+.SS PWM
+The PWM pins and parameters conform to the `canonical analog output' interface
+described in the HAL manual.  The output pins are `up/down' or `pwm/dir'
+pins as described in the documentation of the `pwmgen' component.
+
+Internally the PWM generator is based on a 12-bit, 40MHz counter, giving 4095
+duty cycles from -100% to +100% and a frequency of approximately 19.5kHz.  In
+PDM mode, the duty periods are approximately 100ns long.
+
+.SS Digital I/O
+The digital output pins conform to the `canonical digital output' interface
+described in the HAL manual.
+
+The digital input pins conform to the `canonical digital input' interface
+described in the HAL manual.
+
+.SH FUNCTIONS
+.TP
+\fBpluto-servo.read\fR (requires a floating-point thread)
+Read all the inputs from the pluto-servo board
+.TP
+\fBpluto-servo.write\fR (requires a floating-point thread)
+Write all the outputs on the pluto-servo board
+.SH PINS
+.TP
+.B pluto-servo.encoder.\fIM\fB.count\fR s32 out  (M=0..3) \fR
+.TQ
+.B pluto-servo.encoder.\fIM\fB.position\fR float out  (M=0..3) \fR
+.TQ
+.B pluto-servo.encoder.\fIM\fB.velocity\fR float out  (M=0..3) \fR
+.TQ
+.B pluto-servo.encoder.\fIM\fB.reset\fR bit in  (M=0..3) \fR
+.TQ
+.B pluto-servo.encoder.\fIM\fB.index-enable\fR bit io  (M=0..3) \fR
+encoder.\fIM\fR corresponds to the
+pins labeled QA\fIM\fR, QB\fIM\fR, and QZ\fIM\fR on the pinout diagram
+.TP
+.B pluto-servo.pwm.\fIM\fB.value\fR float in  (M=0..3) \fR
+.TQ
+.B pluto-servo.pwm.\fIM\fB.enable\fR bit in  (M=0..3) \fR
+pwm.\fIM\fR corresponds to the pins labeled UP\fIM\fR and DN\fIM\fR on the pinout diagram
+.TP
+.B pluto-servo.dout.\fIMM\fB\fR bit in  (MM=00..19) \fR
+dout.\fI0M\fR corresponds to the pin labeled
+OUT\fIM\fR on the pinout diagram.  Other pins are shared with the PWM
+function, as follows:
+.RS 6
+.ta T 10 6
+.PP
+\fBPin	Shared\fR
+.PP
+\fBLabel	with\fR
+.PP
+dout.10	UP0
+.PP
+dout.10	UP0
+.PP
+dout.12	UP1
+.PP
+dout.14	UP2
+.PP
+dout.18	UP3
+.PP
+dout.11	DOWN0
+.PP
+dout.13	DOWN1
+.PP
+dout.15	DOWN2
+.PP
+dout.19	DOWN3
+.PP
+.RE 
+.DT
+.TP
+.B pluto-servo.din.\fIMM\fB\fR bit out  (MM=00..19) \fR
+.TQ
+.B pluto-servo.din.\fIMM\fB-not\fR bit out  (MM=00..19) \fR
+For M=0 through 7, din.\fI0M\fR corresponds to the pin labeled
+IN\fIM\fR on the pinout diagram.  Other pins are shared with the encoder
+function, as follows:
+.RS 6
+.ta T 10 6
+.PP
+\fBPin	Shared\fR
+.PP
+\fBLabel	with\fR
+.PP
+din.8	QZ0
+.PP
+din.9	QZ1
+.PP
+din.10	QZ2
+.PP
+din.11	QZ3
+.PP
+din.12	QB0
+.PP
+din.13	QB1
+.PP
+din.14	QB2
+.PP
+din.15	QB3
+.PP
+din.16	QA0
+.PP
+din.17	QA1
+.PP
+din.18	QA2
+.PP
+din.19	QA3
+.PP
+.RE
+.DT
+.SH PARAMETERS
+.TP
+.B pluto-servo.encoder.\fIM\fB.scale\fR float rw  (M=0..3) \fR(default: \fI1\fR)
+.TQ
+.B pluto-servo.encoder.z-polarity\fR bit rw \fR
+Set to TRUE if the index pulse is active low, FALSE if it is active high.  Affects all encoders.
+.TP
+.B pluto-servo.pwm.\fIM\fB.offset\fR float rw  (M=0..3) \fR
+.TQ
+.B pluto-servo.pwm.\fIM\fB.scale\fR float rw  (M=0..3) \fR(default: \fI1\fR)
+.TQ
+.B pluto-servo.pwm.\fIM\fB.max-dc\fR float rw  (M=0..3) \fR(default: \fI1\fR)
+.TQ
+.B pluto-servo.pwm.\fIM\fB.min-dc\fR float rw  (M=0..3) \fR(default: \fI0\fR)
+.TQ
+.B pluto-servo.pwm.\fIM\fB.pwmdir\fR bit rw  (M=0..3) \fR(default: \fI0\fR)
+Set to TRUE use PWM+direction mode.  Set to FALSE to use Up/Down mode.
+.TP
+.B pluto-servo.pwm.is-pdm\fR bit rw \fR
+Set to TRUE to use PDM (also called interleaved PWM) mode.  Set to FALSE to use traditional PWM mode.  Affects all PWM outputs.
+.TP
+.B pluto-servo.dout.\fIMM\fB-invert\fR bit rw  (MM=00..19) \fR
+If TRUE, the output on the corresponding \fBdout.\fIMM\fR is inverted.
+.TP
+.B pluto-servo.communication-error\fR u32 rw \fR
+Incremented each time 
+pluto-servo.read detects an error code in the EPP status register.  While
+this register is nonzero, new values are not being written to the Pluto-P
+board, and the status of digital outputs and the PWM duty cycle of the PWM
+outputs will remain unchanged.  If the watchdog is enabled, it will activate
+soon after the communication error is detected.  To continue after a
+communication error, set this parameter back to zero.
+.TP
+.B pluto-servo.debug-0\fR s32 rw \fR
+.TQ
+.B pluto-servo.debug-1\fR s32 rw \fR
+These parameters can display values which are useful to developers or for debugging the driver and firmware.  They are not useful for integrators or users.
+.SH SEE ALSO
+
+The \fIpluto_servo\fR section in the HAL User Manual, which shows the location of each physical pin on the pluto board.
+.SH LICENSE
+
+GPL

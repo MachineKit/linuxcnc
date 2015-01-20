@@ -1,0 +1,36 @@
+.TH RINGWRITE "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+ringwrite
+.SH SYNOPSIS
+.HP
+.B loadrt ringwrite
+.SH FUNCTIONS
+.TP
+\fBringwrite\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B ringwrite.write\fR bit in \fR
+send a message on pin transition
+.TP
+.B ringwrite.sent\fR u32 out \fR
+number of messages written
+.TP
+.B ringwrite.overrun\fR u32 out \fR
+number of failed write attempts
+.TP
+.B ringwrite.dropped\fR u32 out \fR
+number of records deleted when writing to full buffer
+.TP
+.B ringwrite.circular\fR bit in \fR
+circular flag - set to nonzero to enable circular record buffer
+.SH LICENSE
+
+GPLv2 or later

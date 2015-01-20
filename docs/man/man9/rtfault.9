@@ -1,0 +1,30 @@
+.TH RTFAULT "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+rtfault \- generate RT faults on purpose
+.SH SYNOPSIS
+.HP
+.B loadrt rtfault
+.SH FUNCTIONS
+.TP
+\fBrtfault\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B rtfault.fault\fR bit in \fR
+cause a series of count RT faults
+.TP
+.B rtfault.count\fR u32 in \fR
+number of faults
+.TP
+.B rtfault.delay\fR u32 in \fR
+ms delay on fault ⁽less than 1000)
+.SH LICENSE
+
+GPL
