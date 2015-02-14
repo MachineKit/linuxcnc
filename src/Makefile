@@ -966,7 +966,15 @@ install-python: install-dirs
 endif
 
 install-kernel-dep: install-dirs
-	$(SETUID) ../libexec/rtapi_app_* $(DESTDIR)$(EMC2_LIBEXEC_DIR)
+ifeq ($(HAVE_POSIX_THREADS),yes)	
+	$(SETUID) ../libexec/rtapi_app_posix $(DESTDIR)$(EMC2_LIBEXEC_DIR)
+endif
+ifeq ($(HAVE_RT_PREEMPT_THREADS),yes)	
+	$(SETUID) ../libexec/rtapi_app_rt-preempt $(DESTDIR)$(EMC2_LIBEXEC_DIR)
+endif
+ifeq ($(HAVE_XENOMAI_THREADS),yes)	
+	$(SETUID) ../libexec/rtapi_app_xenomai $(DESTDIR)$(EMC2_LIBEXEC_DIR)
+endif
 	$(SETUID) ../libexec/linuxcnc_module_helper $(DESTDIR)$(EMC2_LIBEXEC_DIR)
 ifeq ($(BUILD_DRIVERS),yes)
 	$(SETUID) ../libexec/pci_write $(DESTDIR)$(EMC2_LIBEXEC_DIR)
