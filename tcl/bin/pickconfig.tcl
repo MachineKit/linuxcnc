@@ -4,7 +4,7 @@ exec wish "$0" "$@"
 
 ###############################################################
 # Description:  pickconfig.tcl
-#               This file validates a LinuxCNC configuration
+#               This file validates a Machinekit configuration
 #               passed to it, or prompts the user to choose
 #               one.
 #
@@ -151,7 +151,7 @@ proc title {node} {
   } else {
     set txt ""
   }
-  wm title . "[msgcat::mc "LinuxCNC Configuration Selector"] $txt"
+  wm title . "[msgcat::mc "Machinekit Configuration Selector"] $txt"
 }
 
 proc find_usable_nodes {startdir} {
@@ -340,7 +340,7 @@ proc SW { args } {
 # a frame for packing the top window
 set f1 [ frame $top.f1 ]
 
-set message [msgcat::mc "Welcome to LinuxCNC.\n\nSelect a machine configuration from the list on the left.\nDetails about the selected configuration will appear in the display on the right.\nClick 'OK' to run the selected configuration"]
+set message [msgcat::mc "Welcome to Machinekit.\n\nSelect a machine configuration from the list on the left.\nDetails about the selected configuration will appear in the display on the right.\nClick 'OK' to run the selected configuration"]
 
 set lbl [ label $f1.lbl -text $message -justify left -padx 15 -pady 10 -wraplength 600 ]
 pack $lbl -anchor w
@@ -746,7 +746,7 @@ proc prompt_copy configname {
         break
     }
 
-    tk_dialog .d [msgcat::mc "Configuration Copied"] [msgcat::mc "The configuration file has been copied to %s. Next time, choose this location when starting LinuxCNC." $copytodir] info 0 [msgcat::mc "OK"]
+    tk_dialog .d [msgcat::mc "Configuration Copied"] [msgcat::mc "The configuration file has been copied to %s. Next time, choose this location when starting Machinekit." $copytodir] info 0 [msgcat::mc "OK"]
 
     return $copytodir/[file tail $configname]
 }
@@ -848,7 +848,7 @@ while {1} {
                 exit
             }
         }
-        set newfilestring "# .linuxcncrc is a startup configuration file for LinuxCNC. \n# format is INI like. \n# \[SECTION_NAME\] \n# VARNAME = varvalue \n# where section name is the name of the system writing to this file \n\n# written by pickconfig.tcl \n\[PICKCONFIG\]\nLAST_CONFIG = $::inifile\n"
+        set newfilestring "# .linuxcncrc is a startup configuration file for Machinekit. \n# format is INI like. \n# \[SECTION_NAME\] \n# VARNAME = varvalue \n# where section name is the name of the system writing to this file \n\n# written by pickconfig.tcl \n\[PICKCONFIG\]\nLAST_CONFIG = $::inifile\n"
                 
         if {[catch {open ~/.linuxcncrc w+} fileout]} {
             puts stderr [msgcat::mc "can't save %s" ~/.linuxcncrc ]

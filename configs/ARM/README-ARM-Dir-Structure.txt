@@ -1,4 +1,4 @@
-Pror to the addition of ARM support to LinuxCNC the only architecture supported was x86.
+Pror to the addition of ARM support to Machinekit the only architecture supported was x86.
 This meant that all the LCNC configs in the linuxcnc/configs directory were a flat collection of configs.
 With the addition of ARM support, some structure has been added to the config tree to make it easier to find things.
 The new structure is present in the ARM sub-tree of the config dir. 
