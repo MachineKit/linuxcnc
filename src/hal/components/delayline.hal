@@ -3,7 +3,7 @@
 loadrt siggen
 setp siggen.0.frequency 1.0 # Hz
 
-loadrt delayline names=foo,bar delay=500,2500 samples=2,2
+loadrt delayline names=foo,bar max_delay=500,2500 samples=2,2
 loadusr halscope
 
 net sawtooth siggen.0.sawtooth foo.in0
