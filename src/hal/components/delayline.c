@@ -143,7 +143,7 @@ static void write_sample_to_ring(void *arg, long period)
 	// if time has increased, then take action by setting the input_ts to the
 	// result of output_ts + delay. Otherwise do nothing. The situation of
 	// decreasing the time will be acted upon in read_sample_to_ring()
-	if (hd->pin_delay > (hal_u32_t * )((hd->input_ts) - (hd->output_ts))) {
+	if ( *(hd->pin_delay) > (hal_u32_t)( hd->input_ts - hd->output_ts)) {
 		if ( *(hd->pin_delay) > hd->max_delay) {
 			hd->delay = hd->max_delay;
 		}
@@ -216,8 +216,8 @@ static void read_sample_from_ring(void *arg, long period)
 	// loss of some records. Make sure you're in a safe situation! 
 	// The situation of increasing the time will be acted upon in
 	// write_sample_to_ring()
-	if (hd->pin_delay < (hal_u32_t * )((hd->input_ts - hd->output_ts))) {
-		if (hd->pin_delay < 0) {
+	if ( *(hd->pin_delay) < (hal_u32_t)(hd->input_ts - hd->output_ts)) {
+		if ( *(hd->pin_delay) < 0) {
 			hd->delay = 0;
 		}
 		else {
