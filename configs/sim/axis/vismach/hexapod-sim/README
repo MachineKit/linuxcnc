@@ -1,4 +1,4 @@
-The hexapod configuration is a set of files that makes up a very basic LinuxCNC hexapod using ini, tbl, var. It is very similar to the sim config template, yet with 6 axes defined.
+The hexapod configuration is a set of files that makes up a very basic Machinekit hexapod using ini, tbl, var. It is very similar to the sim config template, yet with 6 axes defined.
 
 There should be (in the future) a few config files based on the hexapod type you are using.
 
