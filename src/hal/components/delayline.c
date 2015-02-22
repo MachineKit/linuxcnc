@@ -19,6 +19,7 @@
 #include "rtapi_string.h"
 #include "hal.h"
 #include "hal_ring.h"
+#include "hal_priv.h"
 
 MODULE_AUTHOR("Bas de Bruijn");
 MODULE_DESCRIPTION("Delay line component for Machinekit HAL");
@@ -43,38 +44,32 @@ RTAPI_MP_ARRAY_INT(max_delay, MAX_INST,"delayline max number of samples");
 char *samples[MAX_INST];
 RTAPI_MP_ARRAY_STRING(samples, MAX_INST, "delayline pintype sample specifiers");
 
-typedef union {
-	// union for using channels of different types
-	hal_float_t		*pin_flt;
-	hal_bit_t		*pin_bit;
-	hal_u32_t		*pin_u32;
-	hal_s32_t		*pin_s32;
-} u_value;
-
 typedef struct {
 	// pins
 	hal_bit_t		*enable;					// pin: enable this
 	hal_bit_t		*abort;						// pin: abort pin
-	u_value			*pins_in[MAX_SAMPLES];		// pin: array incoming value
-	u_value			*pins_out[MAX_SAMPLES];		// pin: array delayed value
+	hal_data_u		*pins_in[MAX_SAMPLES];		// pin: array incoming value
+	hal_data_u		*pins_out[MAX_SAMPLES];		// pin: array delayed value
 	hal_u32_t		*pin_delay;					// pin: delay time, standard zero
 	hal_u32_t 		*write_fail;				// error counter, write side
 	hal_u32_t 		*read_fail;					// error counter, read side
-	hal_u32_t 		*too_old;					// error counter, samples skipped because too old
+	hal_u32_t 		*too_old;					// error counter, samples skipped
+												//				because too old
 
 	// other params & instance data
-	uint64_t  output_ts, input_ts;
+	hal_type_t pintype[MAX_SAMPLES];// the array which holds the pintype
+	uint64_t  output_ts, input_ts;	// output timestamp and input timestamp
 	unsigned  max_delay;         	// max delay of this line in periods
 	unsigned  delay;             	// delay in periods
 	int nsamples;                	// number of pins in this line
-	size_t sample_size;          	// size determined by union u_value
+	size_t sample_size;          	// size determined by hal_data_u
 	hal_bit_t last_abort;        	// tracking value for edge detection
 	char name[HAL_NAME_LEN + 1];	// of this instance
 } hal_delayline_t;
 
 typedef struct {
 	uint64_t timestamp;			// timestamp of measurement
-	u_value value[0];			// measured value
+	hal_data_u value[0];		// measured value
 } sample_t;
 
 
@@ -111,7 +106,7 @@ int rtapi_app_main(void)
 	// samples="bb,sf,fus" (bit, float, signed, unsigned)
 	if (!samples[0]) {
         rtapi_print_msg(RTAPI_MSG_ERR,
-		"%s : ERROR: a string declaring valid pintypes is needed\n",
+		"%s : ERROR: a string declaring valid pintype is needed\n",
 		cname);
         hal_exit(comp_id);
         return -1;
@@ -204,10 +199,25 @@ static void write_sample_to_ring(void *arg, long period)
 
 	if (!*(hd->enable)) {	// skip if not sampling, just put the input
 							// values into the output values
-	for (j = 0; j < hd->nsamples; j++) {
-		*(hd->pins_out[j]) = *(hd->pins_in[j]);
+		for (j = 0; j < hd->nsamples; j++) {
+			// *(hd->pins_out[j]) = *(hd->pins_in[j]);
+			switch (hd->pintype[j])
+			{
+				case HAL_BIT:
+					hd->pins_out[j]->b = hd->pins_in[j]->b;
+					break;
+				case HAL_FLOAT:
+					hd->pins_out[j]->f = hd->pins_in[j]->f;
+					break;
+				case HAL_S32:
+					hd->pins_out[j]->s = hd->pins_in[j]->s;
+					break;
+				case HAL_U32:
+					hd->pins_out[j]->u = hd->pins_in[j]->u;
+					break;
+			}
 		}
-	goto DONE;
+		goto DONE;
 	}
 
 	// use non-copying write:
@@ -220,7 +230,22 @@ static void write_sample_to_ring(void *arg, long period)
 	// deposit record directly in rb memory
 	s->timestamp = hd->input_ts;
 	for (j = 0; j < hd->nsamples; j++) {
-	s->value[j] = *(hd->pins_in[j]);
+		// s->value[j] = *(hd->pins_in[j]);
+		switch (hd->pintype[j])
+		{
+			case HAL_BIT:
+				s->value[j].b = hd->pins_in[j]->b;
+				break;
+			case HAL_FLOAT:
+				s->value[j].f = hd->pins_in[j]->f;
+				break;
+			case HAL_S32:
+				s->value[j].s = hd->pins_in[j]->s;
+				break;
+			case HAL_U32:
+				s->value[j].u = hd->pins_in[j]->u;
+				break;
+		}
 	}
 
 	// commit the write given the actual write size (which is the same
@@ -233,12 +258,31 @@ static void write_sample_to_ring(void *arg, long period)
 	hd->input_ts++;
 }
 
-// sample the pins to the current rb record
+// sample the output pins to the current rb record
 static inline void apply(const sample_t *s, const hal_delayline_t *hd)
 {
 	int i;
 	for (i = 0; i < hd->nsamples; i++)
-	*(hd->pins_out[i]) = s->value[i];
+	{
+		// *(hd->pins_out[i]) = s->value[i];
+		// because of the union the values and pins must be properly
+		// dereferenced against their type
+		switch (hd->pintype[i])
+		{
+			case HAL_BIT:
+				hd->pins_out[i]->b = s->value[i].b;
+				break;
+			case HAL_FLOAT:
+				hd->pins_out[i]->f = s->value[i].f;
+				break;
+			case HAL_S32:
+				hd->pins_out[i]->s = s->value[i].s;
+				break;
+			case HAL_U32:
+				hd->pins_out[i]->u = s->value[i].u;
+				break;
+		}
+	}
 }
 
 static void read_sample_from_ring(void *arg, long period)
@@ -331,7 +375,7 @@ static int export_delayline(int n)
 
 	// determine the required size of the ringbuffer
 	nr_of_samples = return_instance_samples(n);
-	size_t sample_size = sizeof(sample_t) + (nr_of_samples * sizeof(u_value));
+	size_t sample_size = sizeof(sample_t) + (nr_of_samples * sizeof(hal_data_u));
 
 	// add some headroom to be sure we dont overrun
 	size_t rbsize = record_space(sample_size) * max_delay[n] * RB_HEADROOM;
@@ -369,7 +413,8 @@ static int export_delayline(int n)
 	hd->output_ts = 0;
 	hd->input_ts = hd->delay;
 
-	// init pins
+	// init pins, and at the same time fill the puntype array with
+	// the type of pin[i] so we can later dereference proper
 	char character;
 	for (i = 0; i < hd->nsamples; i++) {
 		character = samples[n][i];
@@ -379,6 +424,8 @@ static int export_delayline(int n)
 		switch (character) {
 			case 'b':
 			case 'B':
+				// fill the pintype[i] array
+				hd->pintype[i] = HAL_BIT;
 				// create bit sample pins
 				rtapi_snprintf(buf, sizeof(buf), "%s.bit-in%d", hd->name, i);
 				retval = hal_pin_new(buf, HAL_BIT, HAL_IN,
@@ -401,6 +448,8 @@ static int export_delayline(int n)
 				break;
 			case 'f':
 			case 'F':
+				// fill the pintype[i] array
+				hd->pintype[i] = HAL_FLOAT;
 				// create float sample pins
 				rtapi_snprintf(buf, sizeof(buf), "%s.flt-in%d", hd->name, i);
 				retval = hal_pin_new(buf, HAL_FLOAT, HAL_IN,
@@ -423,6 +472,8 @@ static int export_delayline(int n)
 				break;
 			case 's':
 			case 'S':
+				// fill the pintype[i] array
+				hd->pintype[i] = HAL_S32;
 				// create s32 sample pins
 				rtapi_snprintf(buf, sizeof(buf), "%s.s32-in%d", hd->name, i);
 				retval = hal_pin_new(buf, HAL_S32, HAL_IN,
@@ -445,6 +496,8 @@ static int export_delayline(int n)
 				break;
 			case 'u':
 			case 'U':
+				// fill the pintype[i] array
+				hd->pintype[i] = HAL_U32;
 				// create u32 sample pins
 				rtapi_snprintf(buf, sizeof(buf), "%s.u32-in%d", hd->name, i);
 				retval = hal_pin_new(buf, HAL_U32, HAL_IN,
@@ -466,6 +519,22 @@ static int export_delayline(int n)
 				}
 				break;
 			}
+		// now set the output pins to zero for good measure
+		switch (hd->pintype[i])
+		{
+		case HAL_BIT:
+			hd->pins_out[i]->b = 0;
+			break;
+		case HAL_FLOAT:
+			hd->pins_out[i]->f = 0.0;
+			break;
+		case HAL_S32:
+			hd->pins_out[i]->s = 0;
+			break;
+		case HAL_U32:
+			hd->pins_out[i]->u = 0;
+			break;
+		}
 	}
 
 	// create other pins
