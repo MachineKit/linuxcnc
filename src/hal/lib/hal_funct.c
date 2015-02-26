@@ -173,6 +173,7 @@ int hal_export_xfunctf(const hal_xfunct_t *xf, const char *fmt, ...)
 
 int hal_call_usrfunct(const char *name, const int argc, const char **argv)
 {
+    hal_funct_t *funct;
 
     if (name == NULL)
 	return -EINVAL;
@@ -180,7 +181,7 @@ int hal_call_usrfunct(const char *name, const int argc, const char **argv)
 	return -EINVAL;
 
     {
-	hal_funct_t *funct __attribute__((cleanup(halpr_autorelease_mutex)));
+	int i __attribute__((cleanup(halpr_autorelease_mutex)));
 	rtapi_mutex_get(&(hal_data->mutex));
 
 	funct = halpr_find_funct_by_name(name);
@@ -198,7 +199,6 @@ int hal_call_usrfunct(const char *name, const int argc, const char **argv)
 	}
 
 	// argv sanity check - we dont want to fail this, esp in kernel land
-	int i;
 	for (i = 0; i < argc; i++) {
 	    if (argv[i] == NULL) {
 		hal_print_msg(RTAPI_MSG_ERR,
@@ -207,18 +207,20 @@ int hal_call_usrfunct(const char *name, const int argc, const char **argv)
 		return -EINVAL;
 	    }
 	}
-	long long int now = rtapi_get_clocks();
-
-	hal_funct_args_t fa = {
-	    .thread_start_time = now,
-	    .start_time = now,
-	    .thread = NULL,
-	    .funct = funct,
-	    .argc = argc,
-	    .argv = argv,
-	};
-	return funct->funct.u(&fa);
     }
+    // call the function with rtapi_mutex unlocked
+    long long int now = rtapi_get_clocks();
+
+    hal_funct_args_t fa = {
+	.thread_start_time = now,
+	.start_time = now,
+	.thread = NULL,
+	.funct = funct,
+	.argc = argc,
+	.argv = argv,
+    };
+    return funct->funct.u(&fa);
+
 }
 #endif // RTAPI
 
