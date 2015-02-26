@@ -220,7 +220,6 @@ int hal_call_usrfunct(const char *name, const int argc, const char **argv)
 	.argv = argv,
     };
     return funct->funct.u(&fa);
-
 }
 #endif // RTAPI
 
