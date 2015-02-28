@@ -1086,6 +1086,7 @@ include $(BASEPWD)/machinetalk/Submakefile
 include $(BASEPWD)/hal/components/Submakefile
 include $(BASEPWD)/hal/vtable-example/Submakefile
 include $(BASEPWD)/hal/userfunct-example/Submakefile
+include $(BASEPWD)/hal/flexcomp-example/Submakefile
 include $(BASEPWD)/machinetalk/msgcomponents/Submakefile
 include $(BASEPWD)/rtapi/Submakefile
 include $(BASEPWD)/rtapi/shmdrv/Submakefile
@@ -1457,6 +1458,9 @@ motmod-objs += libnml/posemath/sincos.o $(MATHSTUB)
 # vtexport-objs := hal/vtable-example/vtexport.o
 # vtexport-objs += hal/vtable-example/vcode.o
 
+obj-m += fcomp.o
+fcomp-objs := hal/flexcomp-example/fcomp.o
+
 obj-m += ufdemo.o
 ufdemo-objs := hal/userfunct-example/ufdemo.o
 
@@ -1634,8 +1638,8 @@ $(RTLIBDIR)/scarakins$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(scarakins-objs))
 $(RTLIBDIR)/hal_gm$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(hal_gm-objs))
 
 $(RTLIBDIR)/tp$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(tp-objs))
-#$(RTLIBDIR)/vtexport$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(vtexport-objs))
 $(RTLIBDIR)/ufdemo$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(ufdemo-objs))
+$(RTLIBDIR)/fcomp$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(fcomp-objs))
 
 ifeq ($(TRIVIAL_BUILD),no)
 READ_RTDEPS = $(wildcard $(RTDEPS))
