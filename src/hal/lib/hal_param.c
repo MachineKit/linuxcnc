@@ -99,8 +99,8 @@ int hal_param_s32_newf(hal_param_dir_t dir, hal_s32_t * data_addr,
 
 /* this is a generic function that does the majority of the work. */
 
-int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *data_addr,
-		  int comp_id)
+int halinst_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *data_addr,
+		      int comp_id, int inst_id)
 {
     int *prev, next, cmp;
     hal_param_t *new, *ptr;
@@ -135,6 +135,7 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
     }
     {
 	hal_comp_t *comp  __attribute__((cleanup(halpr_autorelease_mutex)));
+	hal_inst_t *inst = NULL;
 
 	/* get mutex before accessing shared data */
 	rtapi_mutex_get(&(hal_data->mutex));
@@ -148,6 +149,21 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
 	    hal_print_msg(RTAPI_MSG_ERR,
 			    "HAL: ERROR: component %d not found\n", comp_id);
 	    return -EINVAL;
+	}
+
+	// validate inst_id if given
+	if (inst_id) { // pin is in an instantiable comp
+	    inst = halpr_find_inst_by_id(inst_id);
+	    if (inst == NULL) {
+		hal_print_error("%s: instance %d not found", __FUNCTION__, inst_id);
+		return -EINVAL;
+	    }
+	    // validate that the param actually is allocated in the instance data blob
+	    if (inst_check(inst, (void *) data_addr)) {
+		hal_print_error("memory for param %s not within instance %s/%d memory range",
+				name, inst->name, inst_id);
+		return -EINVAL;
+	    }
 	}
 	/* validate passed in pointer - must point to HAL shmem */
 	if (! SHMCHK(data_addr)) {
@@ -171,6 +187,7 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
 	}
 	/* initialize the structure */
 	new->owner_ptr = SHMOFF(comp);
+	new->instance_ptr = (inst_id == 0) ? 0 : SHMOFF(inst);
 	new->data_ptr = SHMOFF(data_addr);
 	new->type = type;
 	new->dir = dir;
