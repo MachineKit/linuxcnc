@@ -10,10 +10,19 @@ static hal_funct_entry_t *alloc_funct_entry_struct(void);
 
 #ifdef RTAPI
 hal_funct_t *alloc_funct_struct(void);
+static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list ap);
 
-int hal_export_funct(const char *name, void (*funct) (void *, long),
-		     void *arg, int uses_fp, int reentrant, int comp_id)
+int halinst_export_functf(void (*funct) (void *, long),
+			  void *arg,
+			  int uses_fp,
+			  int reentrant,
+			  int comp_id,
+			  int inst_id,
+			  const char *fmt, ...)
 {
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
     hal_xfunct_t xf = {
 	.type = FS_LEGACY_THREADFUNC,
 	.funct.l = funct,
@@ -21,25 +30,34 @@ int hal_export_funct(const char *name, void (*funct) (void *, long),
 	.uses_fp = uses_fp,
 	.reentrant = reentrant,
 	.comp_id = comp_id,
-	.instance_id = 0, // legacy comp - not instantiable
+	.instance_id = inst_id
     };
-    return hal_export_xfunctf(&xf, name);
+    ret = hal_export_xfunctfv(&xf, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int hal_export_xfunctf( const hal_xfunct_t *xf, const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    ret = hal_export_xfunctfv(xf, fmt, ap);
+    va_end(ap);
+    return ret;
 }
 
 int halinst_export_funct(const char *name, void (*funct) (void *, long),
 			 void *arg, int uses_fp, int reentrant,
 			 int comp_id, int instance_id)
 {
-    hal_xfunct_t xf = {
-	.type = FS_LEGACY_THREADFUNC,
-	.funct.l = funct,
-	.arg = arg,
-	.uses_fp = uses_fp,
-	.reentrant = reentrant,
-	.comp_id = comp_id,
-	.instance_id = instance_id
-    };
-    return hal_export_xfunctf(&xf, name);
+    return halinst_export_functf(funct, arg, uses_fp, reentrant, comp_id, instance_id, name);
+}
+
+int hal_export_funct(const char *name, void (*funct) (void *, long),
+		     void *arg, int uses_fp, int reentrant, int comp_id)
+{
+    return halinst_export_functf(funct, arg, uses_fp, reentrant, comp_id, 0, name);
 }
 
 static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list ap)
@@ -102,7 +120,8 @@ static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list 
 			  xf->comp_id, comp->type);
 	    return -EINVAL;
 	}
-	if(comp->state > COMP_INITIALIZING) {
+	// instances may export functs post hal_ready
+	if ((xf->instance_id == 0) && (comp->state > COMP_INITIALIZING)) {
 	    hal_print_msg(RTAPI_MSG_ERR,
 			    "HAL: ERROR: export_funct called after hal_ready\n");
 	    return -EINVAL;
@@ -170,7 +189,8 @@ static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list 
     rtapi_mutex_give(&(hal_data->mutex));
 
     /* create a pin with the function's runtime in it */
-    if (hal_pin_s32_newf(HAL_OUT, &(new->runtime), xf->comp_id,"%s.time",name)) {
+    if (halinst_pin_s32_newf(HAL_OUT, &(new->runtime), xf->comp_id,
+			     xf->instance_id, "%s.time",name)) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
 	   "HAL: ERROR: fail to create pin '%s.time'\n", name);
 	return -EINVAL;
@@ -182,23 +202,13 @@ static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list 
        for debugging and testing use only */
     /* create a parameter with the function's maximum runtime in it */
     new->maxtime = 0;
-    hal_param_s32_newf(HAL_RW,  &(new->maxtime), xf->comp_id, "%s.tmax", name);
+    halinst_param_s32_newf(HAL_RW,  &(new->maxtime), xf->comp_id, xf->instance_id, "%s.tmax", name);
 
     /* create a parameter with the function's maximum runtime in it */
     new->maxtime_increased = 0;
-    hal_param_bit_newf(HAL_RO, &(new->maxtime_increased), xf->comp_id,
+    halinst_param_bit_newf(HAL_RO, &(new->maxtime_increased), xf->comp_id, xf->instance_id,
 		       "%s.tmax-increased", name);
     return 0;
-}
-
-int hal_export_xfunctf(const hal_xfunct_t *xf, const char *fmt, ...)
-{
-    va_list ap;
-    int ret;
-    va_start(ap, fmt);
-    ret = hal_export_xfunctfv(xf, fmt, ap);
-    va_end(ap);
-    return ret;
 }
 
 int hal_call_usrfunct(const char *name, const int argc, const char **argv)
