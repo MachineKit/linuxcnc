@@ -193,10 +193,62 @@ void halpr_autorelease_mutex(void *variable)
 ************************************************************************/
 
 #ifdef RTAPI
+
+// instantiation handlers
+static int create_instance(const hal_funct_args_t *fa)
+{
+    const int argc = fa_argc(fa);
+    const char **argv = fa_argv(fa);
+
+    rtapi_print_msg(RTAPI_MSG_INFO, "%s: '%s' called, arg=%p argc=%d\n",
+    		    __FUNCTION__,  fa_funct_name(fa), fa_arg(fa), argc);
+    int i;
+    for (i = 0; i < argc; i++)
+	rtapi_print_msg(RTAPI_MSG_INFO, "    argv[%d] = \"%s\"\n",
+			i,argv[i]);
+
+    if (argc < 2)
+	return -EINVAL;
+
+    hal_comp_t *comp = halpr_find_comp_by_name(argv[0]);
+    if (!comp)
+	return -EINVAL;
+
+    if (!comp->ctor)
+	return -ENOENT;
+    hal_inst_t *inst = halpr_find_inst_by_name(argv[1]);
+    if (inst)
+	return -EBUSY;
+    return comp->ctor(argv[1], 0, NULL);
+
+}
+
+static int delete_instance(const hal_funct_args_t *fa)
+{
+    const int argc = fa_argc(fa);
+    const char **argv = fa_argv(fa);
+
+
+    rtapi_print_msg(RTAPI_MSG_INFO, "%s: '%s' called, arg=%p argc=%d\n",
+    		    __FUNCTION__,  fa_funct_name(fa), fa_arg(fa), argc);
+    int i;
+    for (i = 0; i < argc; i++)
+	rtapi_print_msg(RTAPI_MSG_INFO, "    argv[%d] = \"%s\"\n",
+			i,argv[i]);
+
+
+    if (argc < 1)
+	return -EINVAL;
+
+    return hal_inst_delete(argv[0]);
+}
+
+
+
 /* these functions are called when the hal_lib module is insmod'ed
    or rmmod'ed.
 */
-
+static int hal_comp_id;
 
 int rtapi_app_main(void)
 {
@@ -268,10 +320,36 @@ int rtapi_app_main(void)
 	return -EINVAL;
     }
 
+
+    hal_comp_id = hal_xinit("hal_lib", TYPE_RT, 0, 0, NULL, NULL);
+
+    // export the instantiation userfuncts
+    hal_xfunct_t ni = {
+	.type = FS_USERLAND,
+	.funct.u = create_instance,
+	.arg = NULL,
+	.comp_id = hal_comp_id
+    };
+    if (hal_export_xfunctf( &ni, "newinst"))
+	return -1;
+
+    hal_xfunct_t di = {
+	.type = FS_USERLAND,
+	.funct.u = delete_instance,
+	.arg = NULL,
+	.comp_id = hal_comp_id
+    };
+    if (hal_export_xfunctf( &di, "delinst"))
+	return -1;
+
+    hal_ready(hal_comp_id);
+
     /* done */
     hal_print_msg(RTAPI_MSG_DBG,
-		    "HAL_LIB:%d kernel lib installed successfully\n",
+		    "HAL_LIB:%d lib installed successfully\n",
 		    rtapi_instance);
+
+
     return 0;
 }
 
@@ -365,8 +443,7 @@ static int init_hal_data(void)
     hal_data->param_free_ptr = 0;
     hal_data->funct_free_ptr = 0;
     hal_data->vtable_free_ptr = 0;
-    hal_data->pending_constructor = 0;
-    hal_data->constructor_prefix[0] = 0;
+
     list_init_entry(&(hal_data->funct_entry_free));
     hal_data->thread_free_ptr = 0;
     hal_data->exact_base_period = 0;
@@ -374,10 +451,12 @@ static int init_hal_data(void)
     hal_data->group_list_ptr = 0;
     hal_data->member_list_ptr = 0;
     hal_data->ring_list_ptr = 0;
+    hal_data->inst_list_ptr = 0;
 
     hal_data->group_free_ptr = 0;
     hal_data->member_free_ptr = 0;
     hal_data->ring_free_ptr = 0;
+    hal_data->inst_free_ptr = 0;
 
     RTAPI_ZERO_BITMAP(&hal_data->rings, HAL_MAX_RINGS);
     // silly 1-based shm segment id allocation FIXED
@@ -500,6 +579,18 @@ void hal_print_msg(int level, const char *fmt, ...)
     va_end(args);
 }
 
+void hal_print_error(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    const char *prefix = "HAL error: ";
+    strncpy(_hal_errmsg, prefix, sizeof(_hal_errmsg));
+
+    vsnprintf(_hal_errmsg + strlen(_hal_errmsg), HALPRINTBUFFERLEN, fmt, args);
+    rtapi_print_msg(RTAPI_MSG_ERR, _hal_errmsg);
+    va_end(args);
+}
+
 const char *hal_lasterror()
 {
     return _hal_errmsg;
@@ -509,22 +600,28 @@ const char *hal_lasterror()
 /* only export symbols when we're building a realtime module */
 
 EXPORT_SYMBOL(hal_init);
-EXPORT_SYMBOL(hal_init_mode);
+EXPORT_SYMBOL(hal_xinit);
 EXPORT_SYMBOL(hal_ready);
 EXPORT_SYMBOL(hal_exit);
 EXPORT_SYMBOL(hal_malloc);
 EXPORT_SYMBOL(hal_comp_name);
 
-EXPORT_SYMBOL(hal_pin_bit_new);
-EXPORT_SYMBOL(hal_pin_float_new);
-EXPORT_SYMBOL(hal_pin_u32_new);
-EXPORT_SYMBOL(hal_pin_s32_new);
-EXPORT_SYMBOL(hal_pin_new);
+EXPORT_SYMBOL(halinst_pin_new);
+
+/* EXPORT_SYMBOL(hal_pin_bit_new); */
+/* EXPORT_SYMBOL(hal_pin_float_new); */
+/* EXPORT_SYMBOL(hal_pin_u32_new); */
+/* EXPORT_SYMBOL(hal_pin_s32_new); */
 
 EXPORT_SYMBOL(hal_pin_bit_newf);
 EXPORT_SYMBOL(hal_pin_float_newf);
 EXPORT_SYMBOL(hal_pin_u32_newf);
 EXPORT_SYMBOL(hal_pin_s32_newf);
+
+EXPORT_SYMBOL(halinst_pin_bit_newf);
+EXPORT_SYMBOL(halinst_pin_float_newf);
+EXPORT_SYMBOL(halinst_pin_u32_newf);
+EXPORT_SYMBOL(halinst_pin_s32_newf);
 
 
 EXPORT_SYMBOL(hal_signal_new);
@@ -532,16 +629,29 @@ EXPORT_SYMBOL(hal_signal_delete);
 EXPORT_SYMBOL(hal_link);
 EXPORT_SYMBOL(hal_unlink);
 
+EXPORT_SYMBOL(halinst_param_new);
+
 EXPORT_SYMBOL(hal_param_bit_new);
 EXPORT_SYMBOL(hal_param_float_new);
 EXPORT_SYMBOL(hal_param_u32_new);
 EXPORT_SYMBOL(hal_param_s32_new);
-EXPORT_SYMBOL(hal_param_new);
 
 EXPORT_SYMBOL(hal_param_bit_newf);
 EXPORT_SYMBOL(hal_param_float_newf);
 EXPORT_SYMBOL(hal_param_u32_newf);
 EXPORT_SYMBOL(hal_param_s32_newf);
+
+
+EXPORT_SYMBOL(halinst_param_bit_new);
+EXPORT_SYMBOL(halinst_param_float_new);
+EXPORT_SYMBOL(halinst_param_u32_new);
+EXPORT_SYMBOL(halinst_param_s32_new);
+
+EXPORT_SYMBOL(halinst_param_bit_newf);
+EXPORT_SYMBOL(halinst_param_float_newf);
+EXPORT_SYMBOL(halinst_param_u32_newf);
+EXPORT_SYMBOL(halinst_param_s32_newf);
+
 
 EXPORT_SYMBOL(hal_param_bit_set);
 EXPORT_SYMBOL(hal_param_float_set);
@@ -549,9 +659,10 @@ EXPORT_SYMBOL(hal_param_u32_set);
 EXPORT_SYMBOL(hal_param_s32_set);
 EXPORT_SYMBOL(hal_param_set);
 
-EXPORT_SYMBOL(hal_set_constructor);
-
 EXPORT_SYMBOL(hal_export_funct);
+EXPORT_SYMBOL(hal_export_xfunctf);
+EXPORT_SYMBOL(halinst_export_funct);
+EXPORT_SYMBOL(halinst_export_functf);
 
 EXPORT_SYMBOL(hal_create_thread);
 EXPORT_SYMBOL(hal_thread_delete);
@@ -577,5 +688,15 @@ EXPORT_SYMBOL(halpr_find_funct_by_owner);
 
 EXPORT_SYMBOL(halpr_find_pin_by_sig);
 EXPORT_SYMBOL(hal_lasterror);
+
+EXPORT_SYMBOL(hal_call_usrfunct);
+
+EXPORT_SYMBOL(hal_inst_create);
+EXPORT_SYMBOL(hal_inst_delete);
+
+EXPORT_SYMBOL(hal_print_msg);
+EXPORT_SYMBOL(hal_print_error);
+
+
 
 #endif /* rtapi */

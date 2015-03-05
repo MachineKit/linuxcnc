@@ -203,7 +203,6 @@ enum comp_type  {
     TYPE_INVALID = 0,
     TYPE_RT,
     TYPE_USER,
-    TYPE_INSTANCE,
     TYPE_REMOTE,
 };
 
@@ -215,14 +214,22 @@ enum comp_state {
     COMP_READY
 };
 
-extern int hal_init_mode(const char *name, int mode, int userarg1, int userarg2);
+typedef int (*hal_constructor_t) (const char *name, const int argc, const char**argv);
+typedef int (*hal_destructor_t) (const char *name, void *inst, const int inst_size);
+
+extern int hal_xinit(const char *name,
+		     int mode,
+		     int userarg1,
+		     int userarg2,
+		     hal_constructor_t ctor,
+		     hal_destructor_t dtor);
 
 // backwards compatibility:
 static inline int hal_init(const char *name) {
 #ifdef RTAPI
-    return hal_init_mode(name, TYPE_RT, 0, 0);
+    return hal_xinit(name, TYPE_RT, 0, 0, NULL, NULL);
 #else
-    return hal_init_mode(name, TYPE_USER, 0, 0);
+    return hal_xinit(name, TYPE_USER, 0, 0, NULL, NULL);
 #endif
 }
 
@@ -389,6 +396,9 @@ const char *hal_lasterror(void);
 void hal_print_msg(int level, const char *fmt, ...)
     __attribute__((format(printf,2,3)));
 
+// shorthand - prints "HAL error: " + formatted part
+void hal_print_error(const char *fmt, ...)
+    __attribute__((format(printf,1,2)));
 
 /** The HAL maintains lists of variables, functions, and so on in
     a central database, located in shared memory so all components
@@ -552,20 +562,61 @@ extern unsigned char hal_get_lock(void);
     If successful, the hal_pin_xxx_new() functions return 0.
     On failure they return a negative error code.
 */
-extern int hal_pin_bit_new(const char *name, hal_pin_dir_t dir,
-    hal_bit_t ** data_ptr_addr, int comp_id);
-extern int hal_pin_float_new(const char *name, hal_pin_dir_t dir,
-    hal_float_t ** data_ptr_addr, int comp_id);
-extern int hal_pin_u32_new(const char *name, hal_pin_dir_t dir,
-    hal_u32_t ** data_ptr_addr, int comp_id);
-extern int hal_pin_s32_new(const char *name, hal_pin_dir_t dir,
-    hal_s32_t ** data_ptr_addr, int comp_id);
+// generic call
+int halinst_pin_new(const char *name, hal_type_t type, hal_pin_dir_t dir,
+		    void **data_ptr_addr, int comp_id, int inst_id);
+
+// takes an instance ID as parameter. If instance ID == 0,
+// behave like the above four functions.
+static inline int halinst_pin_bit_new(const char *name, hal_pin_dir_t dir,
+				      hal_bit_t ** data_ptr_addr, int comp_id, int inst_id) {
+    return halinst_pin_new(name, HAL_BIT, dir, (void **) data_ptr_addr, comp_id, inst_id);
+}
+
+static inline int halinst_pin_float_new(const char *name, hal_pin_dir_t dir,
+				      hal_bit_t ** data_ptr_addr, int comp_id, int inst_id) {
+    return halinst_pin_new(name, HAL_FLOAT, dir, (void **) data_ptr_addr, comp_id, inst_id);
+}
+
+static inline int halinst_pin_s32_new(const char *name, hal_pin_dir_t dir,
+				      hal_bit_t ** data_ptr_addr, int comp_id, int inst_id) {
+    return halinst_pin_new(name, HAL_S32, dir, (void **) data_ptr_addr, comp_id, inst_id);
+}
+static inline int halinst_pin_u32_new(const char *name, hal_pin_dir_t dir,
+				      hal_bit_t ** data_ptr_addr, int comp_id, int inst_id) {
+    return halinst_pin_new(name, HAL_U32, dir, (void **) data_ptr_addr, comp_id, inst_id);
+}
+
+//  these wrappers are for legacy components.
+//  For new code, use instantiable components, and the
+//  the halinst_pin_* functions
+static inline int hal_pin_bit_new(const char *name, hal_pin_dir_t dir,
+				  hal_bit_t ** data_ptr_addr, int comp_id) {
+    return halinst_pin_new(name, HAL_BIT, dir, (void **) data_ptr_addr, comp_id, 0);
+}
+static inline int hal_pin_float_new(const char *name, hal_pin_dir_t dir,
+				    hal_float_t ** data_ptr_addr, int comp_id) {
+    return halinst_pin_new(name, HAL_FLOAT, dir, (void **) data_ptr_addr, comp_id, 0);
+}
+static inline int hal_pin_u32_new(const char *name, hal_pin_dir_t dir,
+				  hal_u32_t ** data_ptr_addr, int comp_id) {
+    return halinst_pin_new(name, HAL_U32, dir, (void **) data_ptr_addr, comp_id, 0);
+}
+static inline int hal_pin_s32_new(const char *name, hal_pin_dir_t dir,
+				  hal_s32_t ** data_ptr_addr, int comp_id) {
+    return halinst_pin_new(name, HAL_S32, dir, (void **) data_ptr_addr, comp_id, 0);
+}
 
 /** The hal_pin_XXX_newf family of functions are similar to
     hal_pin_XXX_new except that they also do printf-style formatting to compute
     the pin name
     If successful, the hal_pin_xxx_newf() functions return 0.
     On failure they return a negative error code.
+
+    DEPRECATION WARNING:
+    these functions are for legacy components.
+    For new code, use instantiable components, and the
+    the halinst_pin_* functions
 */
 extern int hal_pin_bit_newf(hal_pin_dir_t dir,
     hal_bit_t ** data_ptr_addr, int comp_id, const char *fmt, ...)
@@ -579,6 +630,21 @@ extern int hal_pin_u32_newf(hal_pin_dir_t dir,
 extern int hal_pin_s32_newf(hal_pin_dir_t dir,
     hal_s32_t ** data_ptr_addr, int comp_id, const char *fmt, ...)
 	__attribute__((format(printf,4,5)));
+
+// takes an instance ID as parameter. If instance ID == 0,
+// behave like the above four functions.
+extern int halinst_pin_bit_newf(hal_pin_dir_t dir,
+    hal_bit_t ** data_ptr_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
+extern int halinst_pin_float_newf(hal_pin_dir_t dir,
+    hal_float_t ** data_ptr_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
+extern int halinst_pin_u32_newf(hal_pin_dir_t dir,
+    hal_u32_t ** data_ptr_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
+extern int halinst_pin_s32_newf(hal_pin_dir_t dir,
+    hal_s32_t ** data_ptr_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
 
 
 /** 'hal_pin_new()' creates a new 'pin' object.  It is a generic
@@ -596,8 +662,15 @@ extern int hal_pin_s32_newf(hal_pin_dir_t dir,
     If successful, hal_pin_new() returns 0.  On failure
     it returns a negative error code.
 */
-extern int hal_pin_new(const char *name, hal_type_t type, hal_pin_dir_t dir,
-    void **data_ptr_addr, int comp_id);
+
+extern int halinst_pin_new(const char *name, hal_type_t type, hal_pin_dir_t dir,
+			   void **data_ptr_addr, int comp_id, int inst_id);
+
+
+static inline int hal_pin_new(const char *name, hal_type_t type, hal_pin_dir_t dir,
+			      void **data_ptr_addr, int comp_id) {
+    return halinst_pin_new(name, type, dir, data_ptr_addr,  comp_id, 0);
+}
 
 /** There is no 'hal_pin_delete()' function.  Once a component has
     created a pin, that pin remains as long as the component exists.
@@ -668,6 +741,39 @@ extern int hal_unlink(const char *pin_name);
 *                     "PARAMETER" FUNCTIONS                            *
 ************************************************************************/
 
+
+/** 'hal_param_new()' creates a new 'parameter' object.  It is a generic
+    version of the eight functions above.  It is provided ONLY for those
+    special cases where a generic function is needed.  It is STRONGLY
+    recommended that the functions above be used instead, because they
+    check the type of 'data_addr' against the parameter type at compile
+    time.  Using this function requires a cast of the 'data_addr' argument
+    that defeats type checking and can cause subtle bugs.
+    'name', 'data_addr' and 'comp_id' are the same as in the
+    functions above.
+    'type' is the hal type of the new parameter - the type of data
+    that will be stored in the parameter.
+    'dir' is the parameter direction.  HAL_RO paramters are read only from
+    outside, and are written to by the component itself, typically to provide a
+    view "into" the component for testing or troubleshooting.  HAL_RW
+    parameters are writable from outside and also sometimes modified by the
+    component itself as well.
+    If successful, hal_param_new() returns 0.  On failure
+    it returns a negative error code.
+*/
+extern int halinst_param_new(const char *name, hal_type_t type, hal_param_dir_t dir,
+			     volatile void *data_addr, int comp_id, int instance_id);
+static inline int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir,
+				void *data_addr, int comp_id) {
+    return halinst_param_new(name, type, dir, data_addr, comp_id, 0);
+}
+
+
+/** There is no 'hal_param_delete()' function.  Once a component has
+    created a parameter, that parameter remains as long as the
+    component exists.  All parameters belonging to a component are
+    removed when the component calls 'hal_exit()'.
+*/
 /** The 'hal_param_xxx_new()' functions create a new 'parameter' object.
     A parameter is a value that is only used inside a component, but may
     need to be initialized or adjusted from outside the component to set
@@ -699,15 +805,60 @@ extern int hal_unlink(const char *pin_name);
     be using the parameter.
     If successful, the hal_param_xxx_new() functions return 0.
     On failure they return a negative error code.
+
+    use for non-instantiable comps only.
+
 */
-extern int hal_param_bit_new(const char *name, hal_param_dir_t dir,
-    hal_bit_t * data_addr, int comp_id);
-extern int hal_param_float_new(const char *name, hal_param_dir_t dir,
-    hal_float_t * data_addr, int comp_id);
-extern int hal_param_u32_new(const char *name, hal_param_dir_t dir,
-    hal_u32_t * data_addr, int comp_id);
-extern int hal_param_s32_new(const char *name, hal_param_dir_t dir,
-    hal_s32_t * data_addr, int comp_id);
+
+static inline int hal_param_bit_new(const char *name, hal_param_dir_t dir,
+				    hal_bit_t * data_addr, int comp_id) {
+    return  halinst_param_new(name, HAL_BIT, dir,data_addr, comp_id, 0);
+}
+
+static inline int hal_param_float_new(const char *name, hal_param_dir_t dir,
+    hal_float_t * data_addr, int comp_id) {
+    return  halinst_param_new(name, HAL_FLOAT, dir,data_addr, comp_id, 0);
+}
+static inline int hal_param_u32_new(const char *name, hal_param_dir_t dir,
+    hal_u32_t * data_addr, int comp_id) {
+    return  halinst_param_new(name, HAL_U32, dir,data_addr, comp_id, 0);
+}
+static inline int hal_param_s32_new(const char *name, hal_param_dir_t dir,
+    hal_s32_t * data_addr, int comp_id) {
+    return  halinst_param_new(name, HAL_S32, dir,data_addr, comp_id, 0);
+}
+
+// same for instantiable comps - with instance ID parameter
+static inline int halinst_param_bit_new(const char *name, hal_param_dir_t dir,
+					hal_bit_t * data_addr, int comp_id, int inst_id) {
+    return  halinst_param_new(name, HAL_BIT, dir,data_addr, comp_id, inst_id);
+}
+static inline int halinst_param_float_new(const char *name, hal_param_dir_t dir,
+					  hal_float_t * data_addr, int comp_id, int inst_id) {
+    return  halinst_param_new(name, HAL_FLOAT, dir,data_addr, comp_id, inst_id);
+}
+static inline int halinst_param_u32_new(const char *name, hal_param_dir_t dir,
+					hal_u32_t * data_addr, int comp_id, int inst_id) {
+    return  halinst_param_new(name, HAL_U32, dir,data_addr, comp_id, inst_id);
+}
+static inline int halinst_param_s32_new(const char *name, hal_param_dir_t dir,
+					hal_s32_t * data_addr, int comp_id, int inst_id) {
+    return  halinst_param_new(name, HAL_S32, dir,data_addr, comp_id, inst_id);
+}
+
+// same for instantiable comps - with instance ID parameter
+extern int halinst_param_bit_newf(hal_param_dir_t dir,
+    hal_bit_t * data_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
+extern int halinst_param_float_newf(hal_param_dir_t dir,
+    hal_float_t * data_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
+extern int halinst_param_u32_newf(hal_param_dir_t dir,
+    hal_u32_t * data_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
+extern int halinst_param_s32_newf(hal_param_dir_t dir,
+    hal_s32_t * data_addr, int comp_id, int inst_id, const char *fmt, ...)
+	__attribute__((format(printf,5,6)));
 
 /** printf_style-style versions of hal_param_XXX_new */
 extern int hal_param_bit_newf(hal_param_dir_t dir,
@@ -723,34 +874,6 @@ extern int hal_param_s32_newf(hal_param_dir_t dir,
     hal_s32_t * data_addr, int comp_id, const char *fmt, ...)
 	__attribute__((format(printf,4,5)));
 
-
-/** 'hal_param_new()' creates a new 'parameter' object.  It is a generic
-    version of the eight functions above.  It is provided ONLY for those
-    special cases where a generic function is needed.  It is STRONGLY
-    recommended that the functions above be used instead, because they
-    check the type of 'data_addr' against the parameter type at compile
-    time.  Using this function requires a cast of the 'data_addr' argument
-    that defeats type checking and can cause subtle bugs.
-    'name', 'data_addr' and 'comp_id' are the same as in the
-    functions above.
-    'type' is the hal type of the new parameter - the type of data
-    that will be stored in the parameter.
-    'dir' is the parameter direction.  HAL_RO paramters are read only from
-    outside, and are written to by the component itself, typically to provide a
-    view "into" the component for testing or troubleshooting.  HAL_RW
-    parameters are writable from outside and also sometimes modified by the
-    component itself as well.
-    If successful, hal_param_new() returns 0.  On failure
-    it returns a negative error code.
-*/
-extern int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir,
-    void *data_addr, int comp_id);
-
-/** There is no 'hal_param_delete()' function.  Once a component has
-    created a parameter, that parameter remains as long as the
-    component exists.  All parameters belonging to a component are
-    removed when the component calls 'hal_exit()'.
-*/
 
 /** The 'hal_param_xxx_set()' functions modify the value of a parameter.
     'name' is the name of the parameter that is to be set.  The
@@ -828,6 +951,18 @@ extern int hal_param_set(const char *name, hal_type_t type, void *value_addr);
 */
 extern int hal_export_funct(const char *name, void (*funct) (void *, long),
     void *arg, int uses_fp, int reentrant, int comp_id);
+
+extern int halinst_export_funct(const char *name, void (*funct) (void *, long),
+				void *arg, int uses_fp, int reentrant,
+				int comp_id, int inst_id);
+// printf-style variant of the above
+int halinst_export_functf(void (*funct) (void *, long),
+			  void *arg,
+			  int uses_fp,
+			  int reentrant,
+			  int comp_id,
+			  int inst_id,
+			  const char *fmt, ...);
 
 /** hal_create_thread() establishes a realtime thread that will
     execute one or more HAL functions periodically.
@@ -930,17 +1065,18 @@ int hal_reference_vtable(const char *name, int version, void **vtable);
 int hal_unreference_vtable(int vtable_id);
 
 
+int hal_call_usrfunct(const char *name, const int argc, const char **argv);
 
-/** HAL 'constructor' typedef
-    If it is not NULL, this points to a function which can construct a new
-    instance of its component.  Return value is >=0 for success,
-    <0 for error.
-*/
-typedef int(*constructor)(char *prefix, char *arg);
+// public instance API:
 
-/** hal_set_constructor() sets the constructor function for this component
-*/
-extern int hal_set_constructor(int comp_id, constructor make);
+// create named instance blob owned by a comp, returns instance ID
+int hal_inst_create(const char *name,
+		    const int comp_id,
+		    const int size,
+		    void **inst_data);
+
+// delete a named instance.
+int hal_inst_delete(const char *name);
 
 RTAPI_END_DECLS
 

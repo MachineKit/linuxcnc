@@ -10,13 +10,61 @@ static hal_funct_entry_t *alloc_funct_entry_struct(void);
 
 #ifdef RTAPI
 hal_funct_t *alloc_funct_struct(void);
+static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list ap);
+
+int halinst_export_functf(void (*funct) (void *, long),
+			  void *arg,
+			  int uses_fp,
+			  int reentrant,
+			  int comp_id,
+			  int inst_id,
+			  const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    hal_xfunct_t xf = {
+	.type = FS_LEGACY_THREADFUNC,
+	.funct.l = funct,
+	.arg = arg,
+	.uses_fp = uses_fp,
+	.reentrant = reentrant,
+	.comp_id = comp_id,
+	.instance_id = inst_id
+    };
+    ret = hal_export_xfunctfv(&xf, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int hal_export_xfunctf( const hal_xfunct_t *xf, const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    ret = hal_export_xfunctfv(xf, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int halinst_export_funct(const char *name, void (*funct) (void *, long),
+			 void *arg, int uses_fp, int reentrant,
+			 int comp_id, int instance_id)
+{
+    return halinst_export_functf(funct, arg, uses_fp, reentrant, comp_id, instance_id, name);
+}
 
 int hal_export_funct(const char *name, void (*funct) (void *, long),
 		     void *arg, int uses_fp, int reentrant, int comp_id)
 {
-    int *prev, next, cmp;
-    hal_funct_t *new, *fptr;
-    char buf[HAL_NAME_LEN + 1];
+    return halinst_export_functf(funct, arg, uses_fp, reentrant, comp_id, 0, name);
+}
+
+static int hal_export_xfunctfv(const hal_xfunct_t *xf, const char *fmt, va_list ap)
+{
+    int *prev, next, cmp, sz;
+    hal_funct_t *nf, *fptr;
+    char name[HAL_NAME_LEN + 1];
 
     if (hal_data == 0) {
 	hal_print_msg(RTAPI_MSG_ERR,
@@ -24,84 +72,102 @@ int hal_export_funct(const char *name, void (*funct) (void *, long),
 	return -EINVAL;
     }
 
-    if (strlen(name) > HAL_NAME_LEN) {
-	hal_print_msg(RTAPI_MSG_ERR,
-			"HAL: ERROR: function name '%s' is too long\n", name);
-	return -EINVAL;
+    sz = rtapi_vsnprintf(name, sizeof(name), fmt, ap);
+    if(sz == -1 || sz > HAL_NAME_LEN) {
+        hal_print_msg(RTAPI_MSG_ERR,
+	    "hal_export_xfunct: length %d too long for name starting '%s'\n",
+	    sz, name);
+        return -ENOMEM;
     }
+
     if (hal_data->lock & HAL_LOCK_LOAD)  {
 	hal_print_msg(RTAPI_MSG_ERR,
 			"HAL: ERROR: export_funct called while HAL locked\n");
 	return -EPERM;
     }
 
-    hal_print_msg(RTAPI_MSG_DBG, "HAL: exporting function '%s'\n", name);
-
+    hal_print_msg(RTAPI_MSG_DBG, "HAL: exporting function '%s' type %d\n",
+		  name, xf->type);
     {
 	hal_comp_t *comp  __attribute__((cleanup(halpr_autorelease_mutex)));
+	hal_inst_t *inst = NULL;
 
 	/* get mutex before accessing shared data */
 	rtapi_mutex_get(&(hal_data->mutex));
+
 	/* validate comp_id */
-	comp = halpr_find_comp_by_id(comp_id);
+	comp = halpr_find_comp_by_id(xf->comp_id);
 	if (comp == 0) {
 	    /* bad comp_id */
 	    hal_print_msg(RTAPI_MSG_ERR,
-			    "HAL: ERROR: component %d not found\n", comp_id);
+			    "HAL: ERROR: component %d not found\n", xf->comp_id);
 	    return -EINVAL;
 	}
+
+	// validate inst_id if given
+	if (xf->instance_id) { // pin is in an instantiable comp
+	    inst = halpr_find_inst_by_id(xf->instance_id);
+	    if (inst == NULL) {
+		hal_print_error("instance %d not found\n", xf->instance_id);
+		return -EINVAL;
+	    }
+	}
+
 	if (comp->type == TYPE_USER) {
 	    /* not a realtime component */
 	    hal_print_msg(RTAPI_MSG_ERR,
-			    "HAL: ERROR: component %d is not realtime (%d)\n",
-			    comp_id, comp->type);
+			  "HAL: ERROR: component %d is not realtime (%d)\n",
+			  xf->comp_id, comp->type);
 	    return -EINVAL;
 	}
-	if(comp->state > COMP_INITIALIZING) {
+	// instances may export functs post hal_ready
+	if ((xf->instance_id == 0) && (comp->state > COMP_INITIALIZING)) {
 	    hal_print_msg(RTAPI_MSG_ERR,
 			    "HAL: ERROR: export_funct called after hal_ready\n");
 	    return -EINVAL;
 	}
 	/* allocate a new function structure */
-	new = alloc_funct_struct();
-	if (new == 0) {
+	nf = alloc_funct_struct();
+	if (nf == 0) {
 	    /* alloc failed */
 	    hal_print_msg(RTAPI_MSG_ERR,
 			    "HAL: ERROR: insufficient memory for function '%s'\n", name);
 	    return -ENOMEM;
 	}
 	/* initialize the structure */
-	new->uses_fp = uses_fp;
-	new->owner_ptr = SHMOFF(comp);
-	new->reentrant = reentrant;
-	new->users = 0;
-	new->handle = rtapi_next_handle();
-	new->arg = arg;
-	new->funct = funct;
-	rtapi_snprintf(new->name, sizeof(new->name), "%s", name);
+	nf->uses_fp = xf->uses_fp;
+	nf->owner_ptr = SHMOFF(comp);
+	nf->instance_ptr = (xf->instance_id == 0) ? 0 : SHMOFF(inst);
+	nf->reentrant = xf->reentrant;
+	nf->users = 0;
+	nf->handle = rtapi_next_handle();
+	nf->arg = xf->arg;
+	nf->type = xf->type;
+	nf->funct.l = xf->funct.l; // a bit of a cheat really
+	rtapi_snprintf(nf->name, sizeof(nf->name), "%s", name);
 	/* search list for 'name' and insert new structure */
 	prev = &(hal_data->funct_list_ptr);
 	next = *prev;
 	while (1) {
 	    if (next == 0) {
 		/* reached end of list, insert here */
-		new->next_ptr = next;
-		*prev = SHMOFF(new);
+		nf->next_ptr = next;
+		*prev = SHMOFF(nf);
 		/* break out of loop and init the new function */
 		break;
 	    }
 	    fptr = SHMPTR(next);
-	    cmp = strcmp(fptr->name, new->name);
+	    cmp = strcmp(fptr->name, nf->name);
 	    if (cmp > 0) {
 		/* found the right place for it, insert here */
-		new->next_ptr = next;
-		*prev = SHMOFF(new);
+		nf->next_ptr = next;
+		*prev = SHMOFF(nf);
 		/* break out of loop and init the new function */
 		break;
 	    }
 	    if (cmp == 0) {
 		/* name already in list, can't insert */
-		free_funct_struct(new);
+		free_funct_struct(nf);
 		hal_print_msg(RTAPI_MSG_ERR,
 				"HAL: ERROR: duplicate function '%s'\n", name);
 		return -EINVAL;
@@ -115,37 +181,94 @@ int hal_export_funct(const char *name, void (*funct) (void *, long),
 
     }
     /* init time logging variables */
-    new->runtime = 0;
-    new->maxtime = 0;
-    new->maxtime_increased = 0;
+    nf->runtime = 0;
+    nf->maxtime = 0;
+    nf->maxtime_increased = 0;
 
     /* at this point we have a new function and can yield the mutex */
     rtapi_mutex_give(&(hal_data->mutex));
 
-    /* create a pin with the function's runtime in it */
-    if (hal_pin_s32_newf(HAL_OUT, &(new->runtime), comp_id,"%s.time",name)) {
-	rtapi_print_msg(RTAPI_MSG_ERR,
-	   "HAL: ERROR: fail to create pin '%s.time'\n", name);
-	return -EINVAL;
+    switch (xf->type) {
+    case FS_LEGACY_THREADFUNC:
+    case FS_XTHREADFUNC:
+	/* create a pin with the function's runtime in it */
+	if (halinst_pin_s32_newf(HAL_OUT, &(nf->runtime), xf->comp_id,
+				 xf->instance_id, "%s.time",name)) {
+	    rtapi_print_msg(RTAPI_MSG_ERR,
+			    "HAL: ERROR: fail to create pin '%s.time'\n", name);
+	    return -EINVAL;
+	}
+	*(nf->runtime) = 0;
+
+	/* note that failure to successfully create the following params
+	   does not cause the "export_funct()" call to fail - they are
+	   for debugging and testing use only */
+	/* create a parameter with the function's maximum runtime in it */
+	nf->maxtime = 0;
+	halinst_param_s32_newf(HAL_RW,  &(nf->maxtime), xf->comp_id, xf->instance_id, "%s.tmax", name);
+
+	/* create a parameter with the function's maximum runtime in it */
+	nf->maxtime_increased = 0;
+	halinst_param_bit_newf(HAL_RO, &(nf->maxtime_increased), xf->comp_id, xf->instance_id,
+			       "%s.tmax-increased", name);
+	break;
+    case FS_USERLAND: // no timing pins/params
+	;
     }
-    *(new->runtime) = 0;
-
-    /* note that failure to successfully create the following params
-       does not cause the "export_funct()" call to fail - they are
-       for debugging and testing use only */
-    /* create a parameter with the function's maximum runtime in it */
-    rtapi_snprintf(buf, sizeof(buf), "%s.tmax", name);
-    new->maxtime = 0;
-    hal_param_s32_new(buf, HAL_RW, &(new->maxtime), comp_id);
-
-    /* create a parameter with the function's maximum runtime in it */
-    rtapi_snprintf(buf, sizeof(buf), "%s.tmax-increased", name);
-    new->maxtime_increased = 0;
-    hal_param_bit_new(buf, HAL_RO, &(new->maxtime_increased), comp_id);
 
     return 0;
 }
 
+int hal_call_usrfunct(const char *name, const int argc, const char **argv)
+{
+    hal_funct_t *funct;
+
+    if (name == NULL)
+	return -EINVAL;
+    if (argc && (argv == NULL))
+	return -EINVAL;
+
+    {
+	int i __attribute__((cleanup(halpr_autorelease_mutex)));
+	rtapi_mutex_get(&(hal_data->mutex));
+
+	funct = halpr_find_funct_by_name(name);
+	if (funct == NULL) {
+	    hal_print_msg(RTAPI_MSG_ERR,
+			  "HAL: ERROR: hal_call_usrfunct(%s): not found", name);
+	    return -ENOENT;
+	}
+
+	if (funct->type != FS_USERLAND) {
+	    hal_print_msg(RTAPI_MSG_ERR,
+			  "HAL: ERROR: hal_call_usrfunct(%s): bad type %d",
+			  name, funct->type);
+	    return -ENOENT;
+	}
+
+	// argv sanity check - we dont want to fail this, esp in kernel land
+	for (i = 0; i < argc; i++) {
+	    if (argv[i] == NULL) {
+		hal_print_msg(RTAPI_MSG_ERR,
+			      "HAL: ERROR: hal_call_usrfunct(%s): argument %d NULL",
+			      name, i);
+		return -EINVAL;
+	    }
+	}
+    }
+    // call the function with rtapi_mutex unlocked
+    long long int now = rtapi_get_clocks();
+
+    hal_funct_args_t fa = {
+	.thread_start_time = now,
+	.start_time = now,
+	.thread = NULL,
+	.funct = funct,
+	.argc = argc,
+	.argv = argv,
+    };
+    return funct->funct.u(&fa);
+}
 #endif // RTAPI
 
 int hal_add_funct_to_thread(const char *funct_name,
@@ -203,6 +326,17 @@ int hal_add_funct_to_thread(const char *funct_name,
 	    hal_print_msg(RTAPI_MSG_ERR,
 			    "HAL: ERROR: function '%s' not found\n",
 			    funct_name);
+	    return -EINVAL;
+	}
+	// type-check the functions which go onto threads
+	switch (funct->type) {
+	case FS_LEGACY_THREADFUNC:
+	case FS_XTHREADFUNC:
+	    break;
+	default:
+	    hal_print_msg(RTAPI_MSG_ERR,
+			  "HAL: ERROR: cant add type %d function '%s' "
+			  "to a thread\n", funct->type, funct_name);
 	    return -EINVAL;
 	}
 	/* found the function, is it available? */
@@ -268,7 +402,8 @@ int hal_add_funct_to_thread(const char *funct_name,
 	/* init struct contents */
 	funct_entry->funct_ptr = SHMOFF(funct);
 	funct_entry->arg = funct->arg;
-	funct_entry->funct = funct->funct;
+	funct_entry->funct.l = funct->funct.l;
+	funct_entry->type = funct->type;
 	/* add the entry to the list */
 	list_add_after((hal_list_t *) funct_entry, list_entry);
 	/* update the function usage count */
@@ -388,7 +523,7 @@ static hal_funct_entry_t *alloc_funct_entry_struct(void)
 	/* make sure it's empty */
 	p->funct_ptr = 0;
 	p->arg = 0;
-	p->funct = 0;
+	p->funct.l = 0;
     }
     return p;
 }
@@ -405,7 +540,7 @@ void free_funct_entry_struct(hal_funct_entry_t * funct_entry)
     /* clear contents of struct */
     funct_entry->funct_ptr = 0;
     funct_entry->arg = 0;
-    funct_entry->funct = 0;
+    funct_entry->funct.l = 0;
     /* add it to free list */
     list_add_after((hal_list_t *) funct_entry, &(hal_data->funct_entry_free));
 }
@@ -485,7 +620,7 @@ hal_funct_t *alloc_funct_struct(void)
 	p->reentrant = 0;
 	p->users = 0;
 	p->arg = 0;
-	p->funct = 0;
+	p->funct.l = 0;
 	p->name[0] = '\0';
     }
     return p;
@@ -535,10 +670,11 @@ void free_funct_struct(hal_funct_t * funct)
     /* clear contents of struct */
     funct->uses_fp = 0;
     funct->owner_ptr = 0;
+    funct->instance_ptr = 0;
     funct->reentrant = 0;
     funct->users = 0;
     funct->arg = 0;
-    funct->funct = 0;
+    funct->funct.l = 0;
     funct->runtime = 0;
     funct->name[0] = '\0';
     /* add it to free list */

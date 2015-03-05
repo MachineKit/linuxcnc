@@ -12,34 +12,14 @@ static hal_param_t *alloc_param_struct(void);
 *                       "PARAM" FUNCTIONS                              *
 ************************************************************************/
 
-/* wrapper functs for typed params - these call the generic funct below */
-
-int hal_param_bit_new(const char *name, hal_param_dir_t dir, hal_bit_t * data_addr,
-    int comp_id)
+static int halinst_param_newfv(hal_type_t type,
+			       hal_param_dir_t dir,
+			       void *data_addr,
+			       int comp_id,
+			       int inst_id,
+			       const char *fmt,
+			       va_list ap)
 {
-    return hal_param_new(name, HAL_BIT, dir, (void *) data_addr, comp_id);
-}
-
-int hal_param_float_new(const char *name, hal_param_dir_t dir, hal_float_t * data_addr,
-    int comp_id)
-{
-    return hal_param_new(name, HAL_FLOAT, dir, (void *) data_addr, comp_id);
-}
-
-int hal_param_u32_new(const char *name, hal_param_dir_t dir, hal_u32_t * data_addr,
-    int comp_id)
-{
-    return hal_param_new(name, HAL_U32, dir, (void *) data_addr, comp_id);
-}
-
-int hal_param_s32_new(const char *name, hal_param_dir_t dir, hal_s32_t * data_addr,
-    int comp_id)
-{
-    return hal_param_new(name, HAL_S32, dir, (void *) data_addr, comp_id);
-}
-
-static int hal_param_newfv(hal_type_t type, hal_param_dir_t dir,
-	void *data_addr, int comp_id, const char *fmt, va_list ap) {
     char name[HAL_NAME_LEN + 1];
     int sz;
     sz = rtapi_vsnprintf(name, sizeof(name), fmt, ap);
@@ -49,58 +29,101 @@ static int hal_param_newfv(hal_type_t type, hal_param_dir_t dir,
 	    sz, name);
 	return -ENOMEM;
     }
-    return hal_param_new(name, type, dir, (void *) data_addr, comp_id);
+    return halinst_param_new(name, type, dir, (void *) data_addr, comp_id, inst_id);
 }
 
 int hal_param_bit_newf(hal_param_dir_t dir, hal_bit_t * data_addr,
-    int comp_id, const char *fmt, ...)
+		       int comp_id, const char *fmt, ...)
 {
     va_list ap;
     int ret;
     va_start(ap, fmt);
-    ret = hal_param_newfv(HAL_BIT, dir, (void*)data_addr, comp_id, fmt, ap);
+    ret = halinst_param_newfv(HAL_BIT, dir, (void*)data_addr, comp_id, 0, fmt, ap);
     va_end(ap);
     return ret;
 }
 
 int hal_param_float_newf(hal_param_dir_t dir, hal_float_t * data_addr,
-    int comp_id, const char *fmt, ...)
+			 int comp_id, const char *fmt, ...)
 {
     va_list ap;
     int ret;
     va_start(ap, fmt);
-    ret = hal_param_newfv(HAL_FLOAT, dir, (void*)data_addr, comp_id, fmt, ap);
+    ret = halinst_param_newfv(HAL_FLOAT, dir, (void*)data_addr, comp_id, 0, fmt, ap);
     va_end(ap);
     return ret;
 }
 
 int hal_param_u32_newf(hal_param_dir_t dir, hal_u32_t * data_addr,
-    int comp_id, const char *fmt, ...)
+		       int comp_id, const char *fmt, ...)
 {
     va_list ap;
     int ret;
     va_start(ap, fmt);
-    ret = hal_param_newfv(HAL_U32, dir, (void*)data_addr, comp_id, fmt, ap);
+    ret = halinst_param_newfv(HAL_U32, dir, (void*)data_addr, comp_id, 0, fmt, ap);
     va_end(ap);
     return ret;
 }
 
 int hal_param_s32_newf(hal_param_dir_t dir, hal_s32_t * data_addr,
-    int comp_id, const char *fmt, ...)
+		       int comp_id, const char *fmt, ...)
 {
     va_list ap;
     int ret;
     va_start(ap, fmt);
-    ret = hal_param_newfv(HAL_S32, dir, (void*)data_addr, comp_id, fmt, ap);
+    ret = halinst_param_newfv(HAL_S32, dir, (void*)data_addr, comp_id, 0, fmt, ap);
     va_end(ap);
     return ret;
 }
 
+int halinst_param_bit_newf(hal_param_dir_t dir, hal_bit_t * data_addr,
+			   int comp_id, int inst_id, const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    ret = halinst_param_newfv(HAL_BIT, dir, (void*)data_addr, comp_id, inst_id, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int halinst_param_float_newf(hal_param_dir_t dir, hal_float_t * data_addr,
+			 int comp_id, int inst_id, const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    ret = halinst_param_newfv(HAL_FLOAT, dir, (void*)data_addr, comp_id, inst_id, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int halinst_param_u32_newf(hal_param_dir_t dir, hal_u32_t * data_addr,
+		       int comp_id, int inst_id, const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    ret = halinst_param_newfv(HAL_U32, dir, (void*)data_addr, comp_id, inst_id, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int halinst_param_s32_newf(hal_param_dir_t dir, hal_s32_t * data_addr,
+		       int comp_id, int inst_id, const char *fmt, ...)
+{
+    va_list ap;
+    int ret;
+    va_start(ap, fmt);
+    ret = halinst_param_newfv(HAL_S32, dir, (void*)data_addr, comp_id, inst_id, fmt, ap);
+    va_end(ap);
+    return ret;
+}
 
 /* this is a generic function that does the majority of the work. */
 
-int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *data_addr,
-		  int comp_id)
+int halinst_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, volatile void *data_addr,
+		      int comp_id, int inst_id)
 {
     int *prev, next, cmp;
     hal_param_t *new, *ptr;
@@ -135,6 +158,7 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
     }
     {
 	hal_comp_t *comp  __attribute__((cleanup(halpr_autorelease_mutex)));
+	hal_inst_t *inst = NULL;
 
 	/* get mutex before accessing shared data */
 	rtapi_mutex_get(&(hal_data->mutex));
@@ -149,6 +173,23 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
 			    "HAL: ERROR: component %d not found\n", comp_id);
 	    return -EINVAL;
 	}
+
+	// validate inst_id if given
+	if (inst_id) { // pin is in an instantiable comp
+	    inst = halpr_find_inst_by_id(inst_id);
+	    if (inst == NULL) {
+		hal_print_error("%s: instance %d not found", __FUNCTION__, inst_id);
+		return -EINVAL;
+	    }
+	    // validate that the param actually is allocated in the instance data blob
+	    if (!halpr_ptr_in_inst(inst, (void *) data_addr)) {
+		hal_print_msg(RTAPI_MSG_DBG,
+			      "note: memory for param %s not within instance %s/%d memory range "
+			      "(ok for funct timing params)",
+			      name, inst->name, inst_id);
+		// unfortunately we cant make this fatal
+	    }
+	}
 	/* validate passed in pointer - must point to HAL shmem */
 	if (! SHMCHK(data_addr)) {
 	    /* bad pointer */
@@ -156,7 +197,8 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
 			    "HAL: ERROR: data_addr not in shared memory\n");
 	    return -EINVAL;
 	}
-	if(comp->state > COMP_INITIALIZING) {
+	// instances may create params post hal_ready
+	if ((inst_id == 0) && (comp->state > COMP_INITIALIZING)) {
 	    hal_print_msg(RTAPI_MSG_ERR,
 			    "HAL: ERROR: param_new called after hal_ready\n");
 	    return -EINVAL;
@@ -171,6 +213,7 @@ int hal_param_new(const char *name, hal_type_t type, hal_param_dir_t dir, void *
 	}
 	/* initialize the structure */
 	new->owner_ptr = SHMOFF(comp);
+	new->instance_ptr = (inst_id == 0) ? 0 : SHMOFF(inst);
 	new->data_ptr = SHMOFF(data_addr);
 	new->type = type;
 	new->dir = dir;
@@ -521,6 +564,7 @@ void free_param_struct(hal_param_t * p)
     if ( p->oldname != 0 ) free_oldname_struct(SHMPTR(p->oldname));
     p->data_ptr = 0;
     p->owner_ptr = 0;
+    p->instance_ptr = 0;
     p->type = 0;
     p->name[0] = '\0';
     p->handle = -1;

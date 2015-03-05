@@ -5,6 +5,8 @@
 #include "hal.h"		/* HAL public API decls */
 #include "hal_priv.h"		/* HAL private decls */
 
+// maximum argc passed to hal_call_userfunct()
+#define MAX_ARGV 50
 
 #if defined(BUILD_SYS_USER_DSO)
 #undef CONFIG_PROC_FS
@@ -12,39 +14,24 @@
 
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
+#include <linux/string.h>
 extern struct proc_dir_entry *rtapi_dir;
 static struct proc_dir_entry *hal_dir = 0;
-static struct proc_dir_entry *hal_newinst_file = 0;
-static struct proc_dir_entry *hal_threadcmd = 0;
-
-static int proc_write_newinst(struct file *file,
-        const char *buffer, unsigned long count, void *data)
-{
-    if(hal_data->pending_constructor) {
-        hal_print_msg(RTAPI_MSG_DBG,
-                "HAL: running constructor for %s %s\n",
-                hal_data->constructor_prefix,
-                hal_data->constructor_arg);
-        hal_data->pending_constructor(hal_data->constructor_prefix,
-                hal_data->constructor_arg);
-        hal_data->pending_constructor = 0;
-    }
-    return count;
-}
+static struct proc_dir_entry *hal_rtapicmd = 0;
 
 // simple interface to hal_create_thread()/hal_thread_delete()
-// through /proc/rtapi/hal/threadcmd (kernel threadstyles only)
+// through /proc/rtapi/hal/rtapicmd (kernel threadstyles only)
 //
 // to start a thread, write 'newthread' <threadname> <period> <fp> <cpu>'
 // example:
-//    echo newthread servo-thread 1000000 1 -1 >/proc/rtapi/hal/threadcmd
+//    echo newthread servo-thread 1000000 1 -1 >/proc/rtapi/hal/rtapicmd
 //
 // to delete a thread, write 'delthread <threadname>'
-//    echo delthread servo-thread >/proc/rtapi/hal/threadcmd
+//    echo delthread servo-thread >/proc/rtapi/hal/rtapicmd
 //
 // HAL return values are reflected in the return value to write()
 //
-static int proc_write_threadcmd(struct file *file,
+static int proc_write_rtapicmd(struct file *file,
         const char *buffer, unsigned long count, void *data)
 {
     char cmd[20], name[HAL_NAME_LEN + 1];
@@ -87,37 +74,42 @@ static int proc_write_threadcmd(struct file *file,
 	hal_print_msg(RTAPI_MSG_INFO,
 			"HAL:delthread - thread '%s' deleted\n", name);
     } else {
+	// rtapi_argvize modifies its third argument in-place
+	char rwbuf[1024];
+	strncpy(rwbuf, buffer, sizeof(rwbuf));
+
+	char *argv[MAX_ARGV];
+	int argc = rtapi_argvize(MAX_ARGV, argv, rwbuf);
+	if (argc > 1) {
+	    if (!strncmp(argv[0],"call", 4)) {
+		return hal_call_usrfunct(argv[1], argc-2, (const char**)&argv[2]);
+	    }
+	}
+
 	hal_print_msg(RTAPI_MSG_ERR,
-			"HAL: unrecognized threadcmd: '%s'\n", cmd);
+			"HAL: unrecognized rtapicmd: '%s'\n", cmd);
 	return -EINVAL;
     }
     return count;
 }
 
 void hal_proc_clean(void) {
-    if(hal_newinst_file)
-        remove_proc_entry("newinst", hal_dir);
-    if(hal_threadcmd)
-        remove_proc_entry("threadcmd", hal_dir);
+    if(hal_rtapicmd)
+        remove_proc_entry("rtapicmd", hal_dir);
     if(hal_dir)
         remove_proc_entry("hal", rtapi_dir);
-    hal_newinst_file = hal_dir = hal_threadcmd = 0;
+    hal_dir = hal_rtapicmd = 0;
 }
 
 int hal_proc_init(void) {
     if(!rtapi_dir) return 0;
     hal_dir = create_proc_entry("hal", S_IFDIR, rtapi_dir);
     if(!hal_dir) { hal_proc_clean(); return -1; }
-    hal_newinst_file = create_proc_entry("newinst", 0666, hal_dir);
-    if(!hal_newinst_file) { hal_proc_clean(); return -1; }
-    hal_newinst_file->data = NULL;
-    hal_newinst_file->read_proc = NULL;
-    hal_newinst_file->write_proc = proc_write_newinst;
-    hal_threadcmd = create_proc_entry("threadcmd", 0666, hal_dir);
-    if(!hal_threadcmd) { hal_proc_clean(); return -1; }
-    hal_threadcmd->data = NULL;
-    hal_threadcmd->read_proc = NULL;
-    hal_threadcmd->write_proc = proc_write_threadcmd;
+    hal_rtapicmd = create_proc_entry("rtapicmd", 0666, hal_dir);
+    if(!hal_rtapicmd) { hal_proc_clean(); return -1; }
+    hal_rtapicmd->data = NULL;
+    hal_rtapicmd->read_proc = NULL;
+    hal_rtapicmd->write_proc = proc_write_rtapicmd;
     return 0;
 }
 #else

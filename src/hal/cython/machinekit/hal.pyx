@@ -47,7 +47,6 @@ REPORT_END = hal_const.REPORT_END
 TYPE_INVALID = hal_const.TYPE_INVALID
 TYPE_RT = hal_const.TYPE_RT
 TYPE_USER = hal_const.TYPE_USER
-TYPE_INSTANCE = hal_const.TYPE_INSTANCE
 TYPE_REMOTE = hal_const.TYPE_REMOTE
 
 COMP_INVALID = hal_const.COMP_INVALID
@@ -90,7 +89,7 @@ cdef hal_required():
     if not _comps:
         # dummy comp for connecting to HAL
         p = "machinekit::hal%d" % getpid()
-        id = hal_init_mode(p, TYPE_USER, 0,0)
+        id = hal_xinit(p, TYPE_USER, 0, 0, NULL, NULL)
         if hal_data == NULL:
             raise RuntimeError("cant connect to HAL - realtime not running?")
         hal_ready(id)

@@ -15,7 +15,9 @@ hal_comp_t *halpr_alloc_comp_struct(void);
 static void free_comp_struct(hal_comp_t * comp);
 
 
-int hal_init_mode(const char *name, int type, int userarg1, int userarg2)
+int hal_xinit(const char *name, const int type,
+	      const int userarg1, const int userarg2,
+	      const hal_constructor_t ctor,  const hal_destructor_t dtor)
 {
     int comp_id;
     char rtapi_name[RTAPI_NAME_LEN + 1];
@@ -25,14 +27,19 @@ int hal_init_mode(const char *name, int type, int userarg1, int userarg2)
     rtapi_set_logtag("hal_lib");
 
     if (name == 0) {
-	hal_print_msg(RTAPI_MSG_ERR, "HAL: ERROR: no component name\n");
+	hal_print_error("%s: no component name", __FUNCTION__);
 	return -EINVAL;
     }
     if (strlen(name) > HAL_NAME_LEN) {
-	hal_print_msg(RTAPI_MSG_ERR,
-			"HAL: ERROR: component name '%s' is too long\n", name);
+	hal_print_error("%s: component name '%s' is too long\n", __FUNCTION__, name);
 	return -EINVAL;
     }
+    if ((dtor != NULL) && (ctor == NULL)) {
+	hal_print_error("%s: %s - NULL constructor doesnt make sense with non-NULL destructor",
+			__FUNCTION__, name);
+	return -EINVAL;
+    }
+
     // rtapi initialisation already done
     // since this happens through the constructor
     hal_print_msg(RTAPI_MSG_DBG,
@@ -81,6 +88,8 @@ int hal_init_mode(const char *name, int type, int userarg1, int userarg2)
 	comp->userarg2 = userarg2;
 	comp->comp_id = comp_id;
 	comp->type = type;
+	comp->ctor = ctor;
+	comp->dtor = dtor;
 #ifdef RTAPI
 	comp->pid = 0;   //FIXME revisit this
 #else /* ULAPI */
@@ -181,39 +190,6 @@ int hal_exit(int comp_id)
     return 0;
 }
 
-
-#ifdef RTAPI
-int hal_set_constructor(int comp_id, constructor make) {
-    int next;
-    hal_comp_t *comp  __attribute__((cleanup(halpr_autorelease_mutex)));
-
-    rtapi_mutex_get(&(hal_data->mutex));
-
-    /* search component list for 'comp_id' */
-    next = hal_data->comp_list_ptr;
-    if (next == 0) {
-	/* list is empty - should never happen, but... */
-	hal_print_msg(RTAPI_MSG_ERR,
-	    "HAL: ERROR: component %d not found\n", comp_id);
-	return -EINVAL;
-    }
-
-    comp = SHMPTR(next);
-    while (comp->comp_id != comp_id) {
-	/* not a match, try the next one */
-	next = comp->next_ptr;
-	if (next == 0) {
-	    /* reached end of list without finding component */
-	    hal_print_msg(RTAPI_MSG_ERR,
-		"HAL: ERROR: component %d not found\n", comp_id);
-	    return -EINVAL;
-	}
-	comp = SHMPTR(next);
-    }
-    comp->make = make;
-    return 0;
-}
-#endif
 
 int hal_ready(int comp_id) {
     int next;
@@ -337,6 +313,7 @@ static void free_comp_struct(hal_comp_t * comp)
 #endif /* RTAPI */
     hal_pin_t *pin;
     hal_param_t *param;
+    hal_inst_t *inst;
 
     /* can't delete the component until we delete its "stuff" */
     /* need to check for functs only if a realtime component */
@@ -357,7 +334,25 @@ static void free_comp_struct(hal_comp_t * comp)
 	}
 	next = *prev;
     }
+
+    // now that the funct is gone, call the dtor for each instance
+    if (comp->dtor) {
+	//NB - pins, params etc still intact
+	next = hal_data->inst_list_ptr;
+	while (next != 0) {
+	    inst = SHMPTR(next);
+	    if (SHMPTR(inst->owner_ptr) == comp) {
+		// this instance is owned by this comp, call destructor
+		hal_print_msg(RTAPI_MSG_DBG,
+			      "%s: calling custom destructor(%s,%s)", __FUNCTION__,
+			      comp->name, inst->name);
+		comp->dtor(inst->name, inst->inst_data, inst->inst_size);
+	    }
+	    next = inst->next_ptr;
+	}
+    }
 #endif /* RTAPI */
+
     /* search the pin list for this component's pins */
     prev = &(hal_data->pin_list_ptr);
     next = *prev;
@@ -390,9 +385,33 @@ static void free_comp_struct(hal_comp_t * comp)
 	}
 	next = *prev;
     }
+
+    // search the instance list and unlink instances owned by this comp
+    prev = &(hal_data->inst_list_ptr);
+    next = *prev;
+    while (next != 0) {
+	inst = SHMPTR(next);
+	if (SHMPTR(inst->owner_ptr) == comp) {
+	    // this instance is owned by this comp
+	    *prev = inst->next_ptr;
+	    // zap the instance structure
+	    inst->owner_ptr = 0;
+	    inst->inst_id = 0;
+	    inst->inst_data = NULL; // NB - loosing HAL memory here
+	    inst->inst_size = 0;
+	    inst->name[0] = '\0';
+	    // add it to free list
+	    inst->next_ptr = hal_data->inst_free_ptr;
+	    hal_data->inst_free_ptr = SHMOFF(inst);
+	} else {
+	    prev = &(inst->next_ptr);
+	}
+	next = *prev;
+    }
+
     /* now we can delete the component itself */
     /* clear contents of struct */
-    comp->comp_id = -1;
+    comp->comp_id = 0;
     comp->type = TYPE_INVALID;
     comp->state = COMP_INVALID;
     comp->last_bound = 0;

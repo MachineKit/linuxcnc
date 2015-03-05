@@ -281,10 +281,54 @@ static void pbconcat(string &s, const pbstringarray_t &args)
     }
 }
 
+
+static const char **pbargv(const pbstringarray_t &args)
+{
+    const char **argv, **s;
+    s = argv = (const char **) calloc(sizeof(char *), args.size() + 1);
+    for (int i = 0; i < args.size(); i++) {
+	*s++ = args.Get(i).c_str();
+    }
+    *s = NULL;
+    return argv;
+}
+
 static inline bool kernel_threads(flavor_ptr f) {
     assert(f);
     return (f->flags & FLAVOR_KERNEL_BUILD) != 0;
 }
+
+static int do_callfunc_cmd(int instance,
+			   string func,
+			   pbstringarray_t args,
+			   pb::Container &pbreply)
+{
+    int retval = -1;
+
+    if (kernel_threads(flavor)) {
+	string s;
+	pbconcat(s, args);
+	return procfs_cmd(PROCFS_RTAPICMD,"call %s %s", func.c_str(), s.c_str());
+    } else {
+	void *w = modules["hal_lib"];
+	if (w == NULL) {
+	    pbreply.add_note("hal_lib not loaded");
+	    return -1;
+	}
+	dlerror();
+	typedef int (*call_usrfunct_t)(const char *name, const int argc, const char **argv);
+
+	call_usrfunct_t cuf = (call_usrfunct_t) dlsym(w, "hal_call_usrfunct");
+	if (cuf == NULL) {
+	    pbreply.add_note("symbol 'hal_call_usrfunct' not found in hal_lib");
+	    return -1;
+	}
+	// actually call it
+	retval = cuf(func.c_str(), args.size(),  pbargv(args));
+    }
+    return retval;
+}
+
 
 static int do_load_cmd(int instance, string name, pbstringarray_t args)
 {
@@ -546,6 +590,15 @@ static int rtapi_request(zloop_t *loop, zmq_pollitem_t *poller, void *arg)
 	pbreply.set_retcode(0);
 	break;
 
+    case pb::MT_RTAPI_APP_CALLFUNC:
+	assert(pbreq.has_rtapicmd());
+	assert(pbreq.rtapicmd().has_func());
+	assert(pbreq.rtapicmd().has_instance());
+	pbreply.set_retcode(do_callfunc_cmd(pbreq.rtapicmd().instance(),
+					      pbreq.rtapicmd().func(),
+					      pbreq.rtapicmd().argv(),
+					      pbreply));
+	break;
     case pb::MT_RTAPI_APP_LOADRT:
 	assert(pbreq.has_rtapicmd());
 	assert(pbreq.rtapicmd().has_modname());
@@ -590,7 +643,7 @@ static int rtapi_request(zloop_t *loop, zmq_pollitem_t *poller, void *arg)
 	assert(pbreq.rtapicmd().has_instance());
 
 	if (kernel_threads(flavor)) {
-	    int retval =  procfs_threadcmd("newthread %s %d %d %d",
+	    int retval =  procfs_cmd(PROCFS_RTAPICMD,"newthread %s %d %d %d",
 					   pbreq.rtapicmd().threadname().c_str(),
 					   pbreq.rtapicmd().threadperiod(),
 					   pbreq.rtapicmd().use_fp(),
@@ -626,7 +679,7 @@ static int rtapi_request(zloop_t *loop, zmq_pollitem_t *poller, void *arg)
 	assert(pbreq.rtapicmd().has_instance());
 
 	if (kernel_threads(flavor)) {
-	    int retval =  procfs_threadcmd("delthread %s",
+	    int retval =  procfs_cmd(PROCFS_RTAPICMD, "delthread %s",
 					   pbreq.rtapicmd().threadname().c_str());
 	    pbreply.set_retcode(retval < 0 ? retval:0);
 	} else {
