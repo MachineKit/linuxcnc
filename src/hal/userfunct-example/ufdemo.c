@@ -20,7 +20,7 @@ static void legacy_funct(void *arg, long period)
     // measured in the calling library code)
 }
 
-// an extended RT thread functio, more useful arguments passed in:
+// an extended RT thread function, more useful arguments passed in:
 // extended thread functions can be addf'd like legacy functions, the right thing will happen
 // time observation for free!
 static int xthread_funct(const void *arg, const hal_funct_args_t *fa)
