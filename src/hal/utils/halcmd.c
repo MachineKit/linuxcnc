@@ -92,6 +92,7 @@ int prompt_mode = 0;	/* when getting input from stdin, print a prompt */
 int echo_mode = 0;
 char comp_name[HAL_NAME_LEN+1];	/* name for this instance of halcmd */
 flavor_ptr current_flavor;
+int autoload = 1;  // on newinst, if comp not loaded, loadrt it
 
 static void quit(int);
 
@@ -236,15 +237,18 @@ struct halcmd_command halcmd_commands[] = {
     {"newring", FUNCT(do_newring_cmd), A_TWO |  A_PLUS},
     {"delring", FUNCT(do_delring_cmd), A_ONE },
     {"ringdump", FUNCT(do_ringdump_cmd), A_ONE },
-    {"ringread", FUNCT(do_ringread_cmd), A_TWO | A_OPTIONAL },
-    {"ringwrite", FUNCT(do_ringwrite_cmd), A_TWO},
+    {"ringflush", FUNCT(do_ringflush_cmd), A_ONE},
+    {"ringwrite", FUNCT(do_ringwrite_cmd), A_ONE | A_OPTIONAL |  A_PLUS},
     {"newcomp", FUNCT(do_newcomp_cmd), A_ONE |  A_PLUS},
     {"newpin",  FUNCT(do_newpin_cmd), A_THREE |  A_PLUS},
     {"ready",   FUNCT(do_ready_cmd),    A_ONE | A_OPTIONAL },
     {"waitbound", FUNCT(do_waitbound_cmd), A_ONE| A_OPTIONAL  },
     {"waitexists", FUNCT(do_waitexists_cmd), A_ONE },
     {"waitunbound", FUNCT(do_waitunbound_cmd), A_ONE| A_OPTIONAL  },
-
+    {"newinst",  FUNCT(do_newinst_cmd),  A_TWO | A_PLUS },
+    {"delinst",  FUNCT(do_delinst_cmd),  A_ONE },
+    {"call",  FUNCT(do_callfunc_cmd),  A_ONE | A_PLUS },
+    {"autoload", FUNCT(do_autoload_cmd),  A_ONE | A_OPTIONAL },
 };
 int halcmd_ncommands = (sizeof(halcmd_commands) / sizeof(halcmd_commands[0]));
 

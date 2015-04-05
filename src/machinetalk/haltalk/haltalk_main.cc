@@ -60,7 +60,8 @@ static htconf_t conf = {
     2000, // keepalive
     0,
     NULL,
-    0
+    0,
+    true, // trap_signals
 };
 
 
@@ -107,7 +108,8 @@ mainloop( htself_t *self)
 
     zloop_set_verbose (self->z_loop, self->cfg->debug > 8);
 
-    zloop_poller(self->z_loop, &signal_poller, handle_signal, self);
+    if (self->cfg->trap_signals)
+	zloop_poller(self->z_loop, &signal_poller, handle_signal, self);
     zloop_poller(self->z_loop, &group_poller,  handle_group_input, self);
     zloop_poller(self->z_loop, &rcomp_poller,  handle_rcomp_input, self);
     zloop_poller(self->z_loop, &cmd_poller,    handle_command_input, self);
@@ -153,8 +155,10 @@ zmq_init(htself_t *self)
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    self->signal_fd = setup_signals(sigaction_handler, SIGINT, SIGQUIT, SIGKILL, SIGTERM, -1);
-    assert(self->signal_fd > -1);
+    if (conf.trap_signals) {
+	self->signal_fd = setup_signals(sigaction_handler, SIGINT, SIGQUIT, SIGKILL, SIGTERM, -1);
+	assert(self->signal_fd > -1);
+    }
 
     // suppress default handling of signals in zctx_new()
     // since we're using signalfd()
@@ -240,6 +244,8 @@ hal_setup(htself_t *self)
     retval = scan_groups(self);
     if (retval < 0) return retval;
     retval = scan_comps(self);
+    if (retval < 0) return retval;
+    retval = scan_rings(self);
     if (retval < 0) return retval;
     return 0;
 }
@@ -366,6 +372,9 @@ read_config(htconf_t *conf)
 	    conf->command = strdup(uri);
 	}
     }
+    // ease debugging
+    if (conf->trap_signals && (getenv("NOSIGHDLR") != NULL))
+	conf->trap_signals = false;
 
     // bridge: TBD
     if (inifp) {
@@ -412,7 +421,7 @@ usage(void)
 	   "    Turn on event debugging messages.\n");
 }
 
-static const char *option_string = "hI:S:d:t:u:r:T:c:pb:C:U:i:N:R:sK:";
+static const char *option_string = "hI:S:d:t:u:r:T:c:pb:C:U:i:N:R:sK:G";
 static struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
     {"paranoid", no_argument, 0, 'p'},
@@ -432,6 +441,7 @@ static struct option long_options[] = {
     {"interfaces", required_argument, 0, 'N'},
     {"svcuuid", required_argument, 0, 'R'},
     {"stderr",  no_argument,        0, 's'},
+    {"nosighdlr",   no_argument,    0, 'G'},
     {0,0,0,0}
 };
 
@@ -494,6 +504,9 @@ int main (int argc, char *argv[])
 	case 'R':
 	    conf.service_uuid = optarg;
 	    break;
+	case 'G':
+	    conf.trap_signals = false;
+	    break;
 	case 's':
 	    logopt |= LOG_PERROR;
 	    break;
@@ -520,7 +533,10 @@ int main (int argc, char *argv[])
     print_container = self.cfg->debug & 1; // log sent protobuf messages to stderr if debug & 1
 
     retval = hal_setup(&self);
-    if (retval) exit(retval);
+    if (retval) {
+	hal_cleanup(&self);
+	exit(retval);
+    }
 
     retval = zmq_init(&self);
     if (retval) exit(retval);
