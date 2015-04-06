@@ -1,0 +1,6 @@
+# !/bin/bash
+
+    for i in *.icomp
+	{
+	instcomp --install $i
+	}
