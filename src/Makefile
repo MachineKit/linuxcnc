@@ -1470,6 +1470,9 @@ motmod-objs += libnml/posemath/sincos.o $(MATHSTUB)
 obj-m += icomp.o
 icomp-objs := hal/icomp-example/icomp.o
 
+obj-m += trigger.o
+trigger-objs := hal/icomp-example/trigger.o
+
 # clashes with component in i_components
 #obj-m += lutn.o
 #lutn-objs := hal/icomp-example/lutn.o
@@ -1656,6 +1659,7 @@ $(RTLIBDIR)/hal_gm$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(hal_gm-objs))
 $(RTLIBDIR)/tp$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(tp-objs))
 $(RTLIBDIR)/ufdemo$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(ufdemo-objs))
 $(RTLIBDIR)/icomp$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(icomp-objs))
+$(RTLIBDIR)/trigger$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(trigger-objs))
 $(RTLIBDIR)/lutn$(MODULE_EXT):	$(addprefix $(OBJDIR)/,$(lutn-objs))
 
 ifeq ($(TRIVIAL_BUILD),no)
