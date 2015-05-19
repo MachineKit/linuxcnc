@@ -290,8 +290,7 @@ static int proc_read_instance(char *page, char **start, off_t off,
     RTAPI implementation.
 */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
 static const struct file_operations status_file_fops = {
      .read = proc_read_status,
 };
@@ -318,6 +317,24 @@ static const struct file_operations instance_file_fops = {
 };
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
+#define rtapi_create_proc_entry(name,basedir,flags) {		    \
+	name##_file = create_proc_entry(basedir, flags, rtapi_dir); \
+	if (name##_file == NULL) {				    \
+	    return -1;						    \
+	}							    \
+	name##_file->read_proc = proc_read_##name;		    \
+    }
+#else
+#define rtapi_create_proc_entry(name,basedir,flags) {			\
+	name##_file = proc_create(basedir, flags, rtapi_dir, NULL,	\
+				  &name##_file_fops);			\
+	if (status_file == NULL) {					\
+	    return -1;							\
+	}								\
+    }
+#endif
+
 static int proc_init(void)
 {
     /* create the rtapi directory "/proc/rtapi" */
@@ -331,85 +348,22 @@ static int proc_init(void)
     }
 
     /* create read only file "/proc/rtapi/status" */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    status_file = create_proc_entry("status", S_IRUGO, rtapi_dir);
-#else
-    status_file = proc_create("status", S_IRUGO, rtapi_dir, &status_file_fops);
-#endif
-    if (status_file == NULL) {
-	return -1;
-    }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    status_file->read_proc = proc_read_status;
-#endif
+    rtapi_create_proc_entry(status,"status",S_IRUGO);
 
     /* create read only file "/proc/rtapi/modules" */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    modules_file = create_proc_entry("modules", S_IRUGO, rtapi_dir);
-#else
-    modules_file = proc_create("modules", S_IRUGO, rtapi_dir, &modules_file_fops);
-#endif
-    if (modules_file == NULL) {
-	return -1;
-    }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    modules_file->read_proc = proc_read_modules;
-#endif
+    rtapi_create_proc_entry(modules,"modules",S_IRUGO);
 
     /* create read only file "/proc/rtapi/tasks" */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    tasks_file = create_proc_entry("tasks", S_IRUGO, rtapi_dir);
-#else
-    tasks_file = proc_create("tasks", S_IRUGO, rtapi_dir, &tasks_file_fops);
-#endif
-    if (tasks_file == NULL) {
-	return -1;
-    }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    tasks_file->read_proc = proc_read_tasks;
-#endif
+    rtapi_create_proc_entry(tasks,"tasks",S_IRUGO);
 
     /* create read only file "/proc/rtapi/shmem" */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    shmem_file = create_proc_entry("shmem", S_IRUGO, rtapi_dir);
-#else
-    shmem_file = proc_create("shmem", S_IRUGO, rtapi_dir, &shmem_file_fops);
-#endif
-    if (shmem_file == NULL) {
-	return -1;
-    }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    shmem_file->read_proc = proc_read_shmem;
-#endif
+    rtapi_create_proc_entry(shmem,"shmem",S_IRUGO);
 
     /* create read/write file "/proc/rtapi/debug" */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    debug_file = create_proc_entry("debug", S_IRUGO | S_IWUGO, rtapi_dir);
-#else
-    debug_file = proc_create("debug", S_IRUGO | S_IWUGO, rtapi_dir, &debug_file_fops);
-#endif
-    if (debug_file == NULL) {
-	return -1;
-    }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    debug_file->data = NULL;
-    debug_file->read_proc = proc_read_debug;
-    debug_file->write_proc = proc_write_debug;
-#endif
+    rtapi_create_proc_entry(debug,"debug",S_IRUGO|S_IWUGO);
 
     /* create read/write file "/proc/rtapi/instance" */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    instance_file = create_proc_entry("instance", S_IRUGO, rtapi_dir);
-#else
-    instance_file = proc_create("instance", S_IRUGO, rtapi_dir, &instance_file_fops);
-#endif
-    if (instance_file == NULL) {
-	return -1;
-    }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
-    instance_file->data = NULL;
-    instance_file->read_proc = proc_read_instance;
-#endif
+    rtapi_create_proc_entry(instance,"instance",S_IRUGO|S_IWUGO);
 
     return 0;
 }
