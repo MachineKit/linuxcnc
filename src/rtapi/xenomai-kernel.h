@@ -23,7 +23,9 @@
 
 #define FLAVOR_FLAGS XENOMAI_KERNEL_FLAVOR_FLAGS // see rtapi_compat.h
 
-#include <native/task.h>	/* RT_TASK, rt_task_*() */
+#define XENOMAI_INCLUDE(header) <XENOMAI_SKIN/header>
+
+#include XENOMAI_INCLUDE(task.h)	/* RT_TASK, rt_task_*() */
 
 /* rtapi_common.c */
 
