@@ -1407,6 +1407,7 @@ if test "$with_xenomai" != no -o "$with_xenomai_kernel" != no; then
 		3.*)
 		    XENOMAI_SKIN=alchemy
 		    XENOMAI_V2=false
+		    with_xenomai_kernel=no  # No more xenomai kthreads in v3
 		    AC_MSG_RESULT(yes (v3))
 		    ;;
 	    esac
