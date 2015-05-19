@@ -1474,7 +1474,7 @@ if test "$with_xenomai" != no -o "$with_xenomai_kernel" != no; then
     fi
     XENOMAI_KERNEL_THREADS_KERNEL_MATH_CFLAGS="$flags"
     # ldflags
-    flags="$($XENOMAI_THREADS_RTS --ldflags) -lrtdm"
+    flags="$($XENOMAI_THREADS_RTS --ldflags)"
     XENOMAI_THREADS_LDFLAGS="$XENOMAI_THREADS_LDFLAGS $flags"
     XENOMAI_KERNEL_THREADS_LDFLAGS="$XENOMAI_KERNEL_THREADS_LDFLAGS $flags"
 fi
