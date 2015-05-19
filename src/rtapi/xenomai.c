@@ -33,6 +33,7 @@
 #include <signal.h>			/* sigaction/SIGXCPU handling */
 #include <sys/types.h>
 #include <unistd.h>		        // getpid()
+#include <sched.h>			// cpu sets
 
 #ifdef RTAPI
 #include XENOMAI_INCLUDE(mutex.h)
@@ -277,16 +278,16 @@ void _rtapi_task_wrapper(void * task_id_hack) {
 
 int _rtapi_task_start_hook(task_data *task, int task_id) {
     int which_cpu = 0;
+    int uses_fpu = 0;
     int retval;
 
-#if !defined(BROKEN_XENOMAU_CPU_AFFINITY)
+#ifdef XENOMAI_V2
     // seems to work for me
     // not sure T_CPU(n) is possible - see:
     // http://www.xenomai.org/pipermail/xenomai-help/2010-09/msg00081.html
 
     if (task->cpu > -1)  // explicitly set by threads, motmod
 	which_cpu = T_CPU(task->cpu);
-#endif
 
     // http://www.xenomai.org/documentation/trunk/html/api/group__task.html#ga03387550693c21d0223f739570ccd992
     // Passing T_FPU|T_CPU(1) in the mode parameter thus creates a
@@ -294,16 +295,26 @@ int _rtapi_task_start_hook(task_data *task, int task_id) {
     // the task will start out dormant; execution begins with rt_task_start()
 
     // since this is a usermode RT task, it will be FP anyway
+    if (task->uses_fp)
+	uses_fpu = T_FPU;
+#endif
+
     if ((retval = rt_task_create (&ostask_array[task_id], task->name, 
 				  task->stacksize, task->prio, 
-				  (task->uses_fp ? T_FPU : 0) |
-				  which_cpu | T_JOINABLE)
+				  uses_fpu | which_cpu | T_JOINABLE)
 	 ) != 0) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
 			"rt_task_create failed: %d %s\n",
 			retval, strerror(-retval));
 	return -ENOMEM;
     }
+
+#ifndef XENOMAI_V2
+    // Xenomai-3 CPU affinity
+    cpu_set_t cpus;
+    CPU_SET(task->cpu, &cpus);
+    rt_task_set_affinity (&ostask_array[task_id], &cpus);
+#endif
 
     if ((retval = rt_task_start( &ostask_array[task_id],
 				 _rtapi_task_wrapper, (void *)(long)task_id))) {
