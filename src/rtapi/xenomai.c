@@ -464,7 +464,11 @@ int _rtapi_task_self_hook(void) {
 void _rtapi_delay_hook(long int nsec)
 {
     long long int release = rt_timer_tsc() + nsec;
+#ifdef XENOMAI_V2
     while (rt_timer_tsc() < release);
+#else
+    while (rt_timer_read() < release);
+#endif
 }
 #endif
 
@@ -481,6 +485,11 @@ long long int _rtapi_get_time_hook(void) {
    doesn't take a week every time you call it.
 */
 long long int _rtapi_get_clocks_hook(void) {
+#ifdef XENOMAI_V2
     // Gilles says: do this - it's portable
     return rt_timer_tsc();
+#else
+    // ...But rt_timer_tsc removed from Xenomai-3
+    return rt_timer_read();
+#endif
 }
