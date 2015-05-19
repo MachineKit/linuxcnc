@@ -21,19 +21,19 @@
 #include "rtapi.h"
 #include "rtapi_common.h"
 
-#include <nucleus/types.h>		/* XNOBJECT_NAME_LEN, RTIME */
-#include <native/heap.h>		// RT_HEAP, H_SHARED, rt_heap_*
-#include <native/task.h>		// RT_TASK, rt_task_*()
+#define XENOMAI_INCLUDE(header) <XENOMAI_SKIN/header>
+
+#include XENOMAI_INCLUDE(heap.h)	// RT_HEAP, H_SHARED, rt_heap_*
+#include XENOMAI_INCLUDE(task.h)	// RT_TASK, rt_task_*()
 
 #ifdef RTAPI	/* In kernel land, this is equiv. to MODULE */
 #include <linux/slab.h>			// kfree
-#include <native/types.h>		// TM_INFINITE
-#include <native/timer.h>		// rt_timer_*()
+#include XENOMAI_INCLUDE(timer.h)	// rt_timer_*()
 #include "procfs_macros.h"		// PROC_PRINT()
 
 #else /* ULAPI */
-#include <errno.h>		/* errno */
-#include <unistd.h>             // getpid()
+#include <errno.h>			/* errno */
+#include <unistd.h>			// getpid()
 
 #endif
 

@@ -25,17 +25,17 @@
 #include "rtapi.h"
 #include "rtapi_common.h"
 
-#include <sys/mman.h>		/* munlockall() */
-#include <nucleus/types.h>	/* XNOBJECT_NAME_LEN */
-#include <native/task.h>	/* RT_TASK, rt_task_*() */
-#include <native/timer.h>	/* rt_timer_*() */
-#include <signal.h>		/* sigaction/SIGXCPU handling */
+#define XENOMAI_INCLUDE(header) <XENOMAI_SKIN/header>
+
+#include <sys/mman.h>			/* munlockall() */
+#include XENOMAI_INCLUDE(task.h)	/* RT_TASK, rt_task_*() */
+#include XENOMAI_INCLUDE(timer.h)	/* rt_timer_*() */
+#include <signal.h>			/* sigaction/SIGXCPU handling */
 #include <sys/types.h>
-#include <unistd.h>             // getpid()
+#include <unistd.h>		        // getpid()
 
 #ifdef RTAPI
-#include <native/mutex.h>
-#include <rtdk.h>
+#include XENOMAI_INCLUDE(mutex.h)
 #include <stdlib.h>		// abort()
 
 /*  RTAPI task functions  */
@@ -92,12 +92,19 @@ int _rtapi_task_update_stats_hook(void)
 
     rtapi_threadstatus_t *ts = &global_data->thread_status[task_id];
 
+#ifdef XENOMAI_V2
     ts->flavor.xeno.modeswitches = rtinfo.modeswitches;
     ts->flavor.xeno.ctxswitches = rtinfo.ctxswitches;
     ts->flavor.xeno.pagefaults = rtinfo.pagefaults;
     ts->flavor.xeno.exectime = rtinfo.exectime;
-    ts->flavor.xeno.modeswitches = rtinfo.modeswitches;
     ts->flavor.xeno.status = rtinfo.status;
+#else
+    ts->flavor.xeno.modeswitches = rtinfo.stat.msw;
+    ts->flavor.xeno.ctxswitches = rtinfo.stat.csw;
+    ts->flavor.xeno.pagefaults = rtinfo.stat.pf;
+    ts->flavor.xeno.exectime = rtinfo.stat.xtime;
+    ts->flavor.xeno.status = rtinfo.stat.status;
+#endif
 
     ts->num_updates++;
 

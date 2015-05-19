@@ -1401,10 +1401,12 @@ if test "$with_xenomai" != no -o "$with_xenomai_kernel" != no; then
 	    case $(xeno-config --version) in
 	        2.*)
 		    XENOMAI_SKIN=native
+		    XENOMAI_V2=true
 		    AC_MSG_RESULT(yes (v2))
 		    ;;
 		3.*)
 		    XENOMAI_SKIN=alchemy
+		    XENOMAI_V2=false
 		    AC_MSG_RESULT(yes (v3))
 		    ;;
 	    esac
@@ -1822,6 +1824,13 @@ AC_SUBST([RT_PREEMPT_THREADS_LDFLAGS])
 AC_SUBST([RT_PREEMPT_THREADS_RTDIR],[])
 AC_SUBST([RT_PREEMPT_THREADS_RTS],[])
 AC_SUBST([RT_PREEMPT_THREADS_EXTRA_KMODS],[])
+
+# Xenomai general settings
+if test "$XENOMAI_V2" = true; then
+    AC_DEFINE([XENOMAI_V2],[],[Xenomai v.2])
+fi
+AC_DEFINE_UNQUOTED([XENOMAI_SKIN],$XENOMAI_SKIN,
+	[Xenomai skin ('native' for v2, 'alchemy' for v3)])
 
 # Xenomai userland settings
 if test "$with_xenomai" = yes; then
