@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 # Description: configure.ac
-#   Autonconf produce a ./configure from this file
+#   Autoconf produces a ./configure from this file
 #   that's used to discover various programs/dependencies
 #   usage: autoconf
 #
@@ -16,11 +16,8 @@
 #
 #         Copyright (c) 2004 All rights reserved.
 #
-# Last change:
-# This file is released under GPL, refer to docs/README for details
+# This file is released under GPL
 #
-# This file is adapted to replace the old ./configure script
-# therefore it includes parts of that script
 
 ##############################################################################
 # Section 1                                                                  #
