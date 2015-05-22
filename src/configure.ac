@@ -6,17 +6,21 @@
 #   that's used to discover various programs/dependencies
 #   usage: autoconf
 #
-# Authors: paul_c alex_joni jepler
-# License: GPL Version 2
-# System: Linux
+# Authors: mhaberler zultron and other machinekit participants
+#          see https://github.com/machinekit/machinekit
 #
-# Copyright (c) 2004 All rights reserved.
+# Adapted from LinuxCNC configure.ac:
+#         Authors: paul_c alex_joni jepler
+#         License: GPL Version 2
+#         System: Linux
+#
+#         Copyright (c) 2004 All rights reserved.
 #
 # Last change:
 # This file is released under GPL, refer to docs/README for details
 #
 # This file is adapted to replace the old ./configure script
-# therefor it includes parts of that script
+# therefore it includes parts of that script
 
 ##############################################################################
 # Section 1                                                                  #
@@ -24,7 +28,7 @@
 ##############################################################################
 
 AC_PREREQ(2.53)
-AC_INIT([LinuxCNC],[m4_normalize(esyscmd(cat ../VERSION))],[emc-developers@lists.sourceforge.net])
+AC_INIT([Machinekit],[m4_normalize(esyscmd(cat ../VERSION))],[https://github.com/machinekit/machinekit/issues])
 AC_CONFIG_SRCDIR(emc/motion/motion.c)
 if test "$srcdir" != "."; then
     AC_MSG_ERROR([Building outside of srcdir is not supported])
@@ -2170,7 +2174,7 @@ AC_SUBST([EMC2_ICON])
 PKG_CHECK_MODULES(GLIB, glib-2.0)
 
 AC_ARG_ENABLE(gtk,
-    [  --disable-gtk        Disable the parts of LinuxCNC that depend on GTK],
+    [  --disable-gtk        Disable the parts of Machinekit that depend on GTK],
     [
 	case "$enableval" in
 	Y*|y*)
@@ -2896,7 +2900,7 @@ AC_SUBST(MSGFMT)
 
 AC_MSG_CHECKING(for Python support)
 AC_ARG_ENABLE(python,
-    [  --disable-python        Disable the parts of LinuxCNC that depend on Python],
+    [  --disable-python        Disable the parts of Machinekit that depend on Python],
     [
 	case "$enableval" in
 	Y*|y*)
@@ -2911,7 +2915,7 @@ AC_MSG_RESULT($BUILD_PYTHON)
 
 if test "$BUILD_PYTHON" = "yes"; then
     if test "$PYTHON" = "none"; then
-	AC_MSG_ERROR([Python missing.  Install it or specify --disable-python to skip the parts of LinuxCNC that depend on Python])
+	AC_MSG_ERROR([Python missing.  Install it or specify --disable-python to skip the parts of Machinekit that depend on Python])
     fi
 
     AC_MSG_CHECKING([python version])
@@ -2969,15 +2973,15 @@ Install this version and specify --with-tcl and --with-tk if necessary])
     AX_BOOST_PYTHON_EMC
 
     AC_CHECK_HEADER($INCLUDEPY/Python.h,[],
-	[AC_MSG_ERROR([Required header Python.h missing.  Install it, or specify --disable-python to skip the parts of LinuxCNC that depend on Python])])
+	[AC_MSG_ERROR([Required header Python.h missing.  Install it, or specify --disable-python to skip the parts of Machinekit that depend on Python])])
 
     AC_MSG_CHECKING(for site-package location)
     SITEPY=`$PYTHON -c 'import distutils.sysconfig; print distutils.sysconfig.get_python_lib(1)'`
     AC_MSG_RESULT($SITEPY)
 
-    AC_CHECK_HEADERS(GL/gl.h GL/glu.h,[],[AC_MSG_ERROR([Required OpenGL header missing.  Install it, or specify --disable-python to skip the parts of LinuxCNC that depend on Python])])
+    AC_CHECK_HEADERS(GL/gl.h GL/glu.h,[],[AC_MSG_ERROR([Required OpenGL header missing.  Install it, or specify --disable-python to skip the parts of Machinekit that depend on Python])])
 
-    AC_CHECK_LIB(GL, glBegin, [], [AC_MSG_ERROR([Required GL library missing.  Install it, or specify --disable-python to skip the parts of LinuxCNC that depend on Python])])
+    AC_CHECK_LIB(GL, glBegin, [], [AC_MSG_ERROR([Required GL library missing.  Install it, or specify --disable-python to skip the parts of Machinekit that depend on Python])])
 
     AC_MSG_CHECKING(for working GLU quadrics)
 
@@ -2987,12 +2991,12 @@ Install this version and specify --with-tcl and --with-tk if necessary])
 ],
 	[GLUquadric *q;],
 	[AC_MSG_RESULT(yes)],[
-		AC_MSG_ERROR([Required GLU library missing.  Install it or specify --disable-python to skip the parts of LinuxCNC that depend on Python])]
+		AC_MSG_ERROR([Required GLU library missing.  Install it or specify --disable-python to skip the parts of Machinekit that depend on Python])]
 
     )
 
     AC_MSG_CHECKING(for Xmu headers)
-    AC_CHECK_HEADERS(X11/Xmu/Xmu.h,[],[AC_MSG_ERROR([Required Xmu header missing.  Install it, or specify --disable-python to skip the parts of LinuxCNC that depend on Python])])
+    AC_CHECK_HEADERS(X11/Xmu/Xmu.h,[],[AC_MSG_ERROR([Required Xmu header missing.  Install it, or specify --disable-python to skip the parts of Machinekit that depend on Python])])
 fi
 
 AC_SUBST([BUILD_PYTHON])
@@ -3095,12 +3099,12 @@ offbold () {
 echo ""
 echo ""
 echo "######################################################################"
-echo "#                LinuxCNC - Enhanced Machine Controller              #"
+echo "#                              Machinekit                            #"
 echo "######################################################################"
 echo "#                                                                    #"
-echo "#   LinuxCNC is a software system for computer control of machine    #"
-echo "#   tools such as milling machines. LinuxCNC is released under the   #"
-echo "#   GPL.  Check out http://www.linuxcnc.org/ for more details.       #"
+echo "#   Machinekit is a platform for machine control applications.       #"
+echo "#   Machinekit is released under the GPL.                            #"
+echo "#   Check out http://machinekit.io/ for more details.                #"
 echo "#                                                                    #"
 echo "#                                                                    #"
 echo "#   It seems that ./configure completed successfully.                #"
@@ -3118,11 +3122,11 @@ echo "#   Before running the software, set the environment:                #"
 echo "#         . (top dir)/scripts/rip-environment                        #"
 else
 bold
-echo "#   warning: If you already have an installed linuxcnc, this will    #"
-echo "#         replace an existing installation.  If you have installed   #"
-echo "#         a linuxcnc package, this will damage the package.          #"
+echo "#   warning: If you have already built machinekit from sources,      #"
+echo "#         this will replace the result.  If you have installed       #"
+echo "#         a machinekit package, this will damage the package.        #"
 offbold
-echo "#   hint: To test a self-built version of linuxcnc without damaging  #"
+echo "#   hint: To test a self-built version of machinekit without         #"
 echo "#         the package version, don't specify a --prefix              #"
 echo "#                                                                    #"
 echo "#   Next compile by typing                                           #"
@@ -3131,8 +3135,8 @@ echo "#   then install it by typing                                        #"
 echo "#         sudo make install                                          #"
 fi
 echo "#                                                                    #"
-echo "#   To run the software type                                         #"
-echo "#         linuxcnc                                                   #"
+echo "#   To start the original launcher type                              #"
+echo "#         machinekit                                                 #"
 echo "#                                                                    #"
 echo "######################################################################"
 echo ""
