@@ -68,7 +68,7 @@ int b, running_total;
 	if (!hold) 
 		{
 		running_total = offset;
-		for (b=0 ; b < pincount ; b++) 
+		for (b=0 ; b < localpincount ; b++) 
 			{
 			if (in(b)) 
 				running_total += weight(b);

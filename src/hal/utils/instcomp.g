@@ -536,7 +536,8 @@ static int comp_id;
             print >>f, "    %s %s[%d];" % (type, name, maxpins )
         else:
             print >>f, "    %s %s;" % (type, name)
-
+    ##local copy used in function and set to default value
+    print >>f, "    int localpincount;"
     print >>f, "    };"
 
 ############## extra headers and forward defines of functions  ##########################
@@ -579,20 +580,21 @@ static int comp_id;
     print >>f
 
 ###################################  funct()  #######################################
-
-    print >>f, "static int funct(const void *arg, const hal_funct_args_t *fa)\n{"
-    print >>f, "long period __attribute__((unused)) = fa_period(fa);\n"
-
-    print >>f, "    // the following accessors are available here:"
-    print >>f, "    // fa_period(fa) - formerly 'long period'"
-    print >>f, "    // fa_thread_start_time(fa): _actual_ start time of thread invocation"
-    print >>f, "    // fa_start_time(fa): _actual_ start time of function invocation"
-    print >>f, "    // fa_thread_name(fa): name of the calling thread (char *)"
-    print >>f, "    // fa_funct_name(fa): name of the this called function (char *)"
-    print >>f, "    return 0;\n}\n"
-
-
-
+#    Stub for future use if required
+#
+#    print >>f, "static int funct(const void *arg, const hal_funct_args_t *fa)\n{"
+#    print >>f, "long period __attribute__((unused)) = fa_period(fa);\n"
+#
+#    print >>f, "    // the following accessors are available here:"
+#    print >>f, "    // fa_period(fa) - formerly 'long period'"
+#    print >>f, "    // fa_thread_start_time(fa): _actual_ start time of thread invocation"
+#    print >>f, "    // fa_start_time(fa): _actual_ start time of function invocation"
+#    print >>f, "    // fa_thread_name(fa): name of the calling thread (char *)"
+#    print >>f, "    // fa_funct_name(fa): name of the this called function (char *)"
+#    print >>f, "    return 0;\n}\n"
+#
+#
+#
 ###########################  export_halobjs()  ######################################################
 
     print >>f, "static int export_halobjs(struct inst_data *ip, int owner_id, const char *name)\n{"
@@ -649,6 +651,11 @@ static int comp_id;
         else:
             print >>f, "    ip->%s = %s;" % (name, value)
 
+    print >>f, "\n// if not set by instantiate() set to default"
+    print >>f, "    if(! ip->localpincount)"
+    print >>f, "         ip->localpincount = %d;\n" % maxpins
+    print >>f, "    hal_print_msg(RTAPI_MSG_DBG,\"export_halobjs() ip->localpincount set to %d\", ip->localpincount);"
+
     for name, fp in functions:
         print >>f, "    // exporting an extended thread function:"
         print >>f, "    hal_export_xfunct_args_t %s_xf = " % to_c(name)
@@ -691,6 +698,7 @@ static int comp_id;
     print >>f, "// here ip is guaranteed to point to a blob of HAL memory of size sizeof(struct inst_data)."
     print >>f, "    hal_print_msg(RTAPI_MSG_DBG,\"%s inst=%s argc=%d\",__FUNCTION__, name, argc);\n"
     print >>f, "// Debug print of params and values"
+
     for name, mptype, value in instanceparams:
         if (mptype == 'int'):
             strg = "    hal_print_msg(RTAPI_MSG_DBG,\"%s: int instance param: %s=%d\",__FUNCTION__,"
@@ -700,7 +708,17 @@ static int comp_id;
             strg = "    hal_print_msg(RTAPI_MSG_DBG,\"%s: string instance param: %s=%s\",__FUNCTION__,"
             strg += "\"%s\", %s);" % (to_c(name), to_c(name))
             print >>f, strg
-
+    for name, mptype, value in instanceparams:
+        if name == 'pincount':
+            if value != None:
+                newval = int(value)
+                print >>f, "//  if pincount=NN is passed, set local variable here"
+                print >>f, "    int pin_param_value = pincount;"
+                print >>f, "    if(pin_param_value)\n        {"
+                print >>f, "        if(pin_param_value > maxpins)"
+                print >>f, "            pin_param_value = maxpins;"
+                print >>f, "        ip->localpincount = pin_param_value;\n        }"
+                print >>f, "    hal_print_msg(RTAPI_MSG_DBG,\"ip->localpincount set to %d\", pin_param_value);"
     print >>f, "\n// These pins - params - functs will be owned by the instance, and can be separately exited with delinst"
 
     print >>f, "    if(strlen(iprefix))"
@@ -738,19 +756,22 @@ static int comp_id;
     print >>f, "    if (comp_id < 0)"
     print >>f, "        return -1;\n"
 
-    print >>f, "    // exporting an extended thread function:"
-    print >>f, "    hal_export_xfunct_args_t xtf = "
-    print >>f, "        {"
-    print >>f, "        .type = FS_XTHREADFUNC,"
-    print >>f, "        .funct.x = (void *) funct,"
-    print >>f, "        .arg = \"x-instance-data\","
-    print >>f, "        .uses_fp = 0,"
-    print >>f, "        .reentrant = 0,"
-    print >>f, "        .owner_id = comp_id"
-    print >>f, "        };\n"
-
-    print >>f, "    if (hal_export_xfunctf(&xtf,\"%s.funct\", compname))"
-    print >>f, "        return -1;"
+################  stub to allow 'base component to have function if req later ####
+#
+#    print >>f, "    // exporting an extended thread function:"
+#    print >>f, "    hal_export_xfunct_args_t xtf = "
+#    print >>f, "        {"
+#    print >>f, "        .type = FS_XTHREADFUNC,"
+#    print >>f, "        .funct.x = (void *) funct,"
+#    print >>f, "        .arg = \"x-instance-data\","
+#    print >>f, "        .uses_fp = 0,"
+#    print >>f, "        .reentrant = 0,"
+#    print >>f, "        .owner_id = comp_id"
+#    print >>f, "        };\n"
+#
+#    print >>f, "    if (hal_export_xfunctf(&xtf,\"%s.funct\", compname))"
+#    print >>f, "        return -1;"
+##################################################################################
 
     print >>f, "    hal_ready(comp_id);\n"
 
@@ -834,8 +855,12 @@ static int comp_id;
         for type, name, array, value in variables:
             name = name.replace("*", "")
             print >>f, "#undef %s" % name
-            print >>f, "#define %s (ip->%s)" % (name, name)
-
+#           if array:
+#                print >>f, "#define %s(i) (ip->%s[i])" % (to_c(name), to_c(name))
+#            else:
+            print >>f, "#define %s (ip->%s)" % (to_c(name), to_c(name) )
+        print >>f, "#undef localpincount"
+        print >>f, "#define localpincount (ip->localpincount)"
     print >>f
     print >>f
 
