@@ -24,7 +24,7 @@ int i;
 ip = arg;
 int shift = 0;
 
-    for (i = 0; i < pincount; i++)
+    for (i = 0; i < localpincount; i++)
 	if (in(i))
 	    shift += (1 << i);
 
