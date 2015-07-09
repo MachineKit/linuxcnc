@@ -18,7 +18,8 @@
 //
 //    The code in this file is based on UFLBP.PAS by Peter C. Wallace.  
 
-#include <linux/firmware.h>
+#include "userpci/string.h"
+#include "userpci/gfp.h"
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "hal.h"
