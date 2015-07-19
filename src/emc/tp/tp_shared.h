@@ -4,8 +4,8 @@
 #include "hal.h"
 #include "emcpose.h"
 
-typedef void (*emcmotDioWrite_t)(int index, hal_bit_t   value);
-typedef void (*emcmotAioWrite_t)(int index, hal_float_t value);
+typedef void (*emcmotDioWrite_t)(unsigned int index, hal_bit_t   value);
+typedef void (*emcmotAioWrite_t)(unsigned int index, hal_float_t value);
 
 typedef void (*emcmotSetRotaryUnlock_t)(int axis, hal_bit_t unlock);
 typedef hal_bit_t  (*emcmotGetRotaryIsUnlocked_t)(int axis);
@@ -136,9 +136,9 @@ static inline hal_float_t get_arcBlendRampFreq(tp_shared_t *ts)
 static inline void set_arcBlendRampFreq(tp_shared_t *ts, hal_float_t n)
 { *(ts->arcBlendRampFreq) = n; }
 
-static inline void dioWrite(tp_shared_t *ts, int index, char value)
+static inline void dioWrite(tp_shared_t *ts, unsigned int index, char value)
 { if (ts->dioWrite) ts->dioWrite(index, value); }
-static inline void aioWrite(tp_shared_t *ts, int index, double value)
+static inline void aioWrite(tp_shared_t *ts, unsigned int index, double value)
 { if (ts->aioWrite) ts->aioWrite(index, value); }
 
 static inline hal_float_t get_spindleRevs(tp_shared_t *ts)
@@ -206,6 +206,25 @@ static inline int emcPoseSub2fp(EmcPose const * const p1,
     *(out[6]) = p1->u - p2->u;
     *(out[7]) = p1->v - p2->v;
     *(out[8]) = p1->w - p2->w;
+    return EMCPOSE_ERR_OK;
+}
+
+static inline int emcPoseZero2fp(hal_float_t ** const out)
+{
+#ifdef EMCPOSE_PEDANTIC
+    if (!pos) {
+        return EMCPOSE_ERR_INPUT_MISSING;
+    }
+#endif
+    *(out[0]) = 0.0;
+    *(out[1]) = 0.0;
+    *(out[2]) = 0.0;
+    *(out[3]) = 0.0;
+    *(out[4]) = 0.0;
+    *(out[5]) = 0.0;
+    *(out[6]) = 0.0;
+    *(out[7]) = 0.0;
+    *(out[8]) = 0.0;
     return EMCPOSE_ERR_OK;
 }
 

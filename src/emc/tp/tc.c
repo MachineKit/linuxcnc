@@ -126,6 +126,25 @@ int tcGetIntersectionPoint(TC_STRUCT const * const prev_tc,
     return TP_ERR_OK;
 }
 
+
+/**
+ * Check if a segment can be consumed without disrupting motion or synced IO.
+ */
+int tcCanConsume(TC_STRUCT const * const tc)
+{
+    if (!tc) {
+        return false;
+    }
+
+    if (tc->syncdio.anychanged || tc->blend_prev || tc->atspeed) {
+        //TODO add other conditions here (for any segment that should not be consumed by blending
+        return false;
+    }
+
+    return true;
+
+}
+
 /**
  * Find the geometric tangent vector to a helical arc.
  * Unlike the acceleration vector, the result of this calculation is a vector
@@ -415,10 +434,10 @@ int tcFindBlendTolerance(TC_STRUCT const * const prev_tc,
     if (T2 == 0) {
         T2 = tc->nominal_length * tolerance_ratio;
     }
-    *nominal_tolerance = fmin(T1,T2);
+    *nominal_tolerance = rtapi_fmin(T1,T2);
     //Blend tolerance is the limit of what we can reach by blending alone,
     //consuming half a segment or less (parabolic equivalent)
-    double blend_tolerance = fmin(fmin(*nominal_tolerance, 
+    double blend_tolerance = rtapi_fmin(rtapi_fmin(*nominal_tolerance, 
                 prev_tc->nominal_length * tolerance_ratio),
             tc->nominal_length * tolerance_ratio);
     *T_blend = blend_tolerance;
@@ -688,10 +707,14 @@ int pmRigidTapInit(PmRigidTap * const tap,
 
 }
 
-int pmRigidTapTarget(PmRigidTap * const tap, double uu_per_rev)
+double pmRigidTapTarget(PmRigidTap * const tap, double uu_per_rev)
 {
     // allow 10 turns of the spindle to stop - we don't want to just go on forever
-    return tap->xyz.tmag + 10. * uu_per_rev;
+    double overrun = 10. * uu_per_rev;
+    double target = tap->xyz.tmag + overrun;
+    tp_debug_print("initial tmag = %.12g, added %.12g for overrun, target = %.12g\n",
+            tap->xyz.tmag, overrun,target);
+    return target;
 }
 
 /** Returns true if segment has ONLY rotary motion, false otherwise. */
