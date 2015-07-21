@@ -3,11 +3,17 @@
 from nose import with_setup
 from machinekit.nosetests.realtime import setup_module,teardown_module
 from machinekit.nosetests.support import fnear
+from machinekit.nosetests.rtapilog import Log
 
-from machinekit import hal
+from machinekit import hal,rtapi
 import os
 
+l = Log(level=rtapi.MSG_INFO,tag="nosetest")
+
+
+
 def test_component_creation():
+    l.log()
     global c1,c2
     c1 = hal.Component("c1")
     c1.newpin("s32out", hal.HAL_S32, hal.HAL_OUT, init=42)
@@ -29,6 +35,7 @@ def test_component_creation():
     c2.ready()
 
 def test_net_existing_signal_with_bad_type():
+    l.log()
     hal.newsig("f", hal.HAL_FLOAT)
     try:
         hal.net("f", "c1.s32out")
@@ -38,6 +45,7 @@ def test_net_existing_signal_with_bad_type():
     del hal.signals["f"]
 
 def test_net_match_nonexistant_signals():
+    l.log()
     try:
         hal.net("nosuchsig", "c1.s32out","c2.s32out")
         raise "should not happen"
@@ -45,6 +53,7 @@ def test_net_match_nonexistant_signals():
         pass
 
 def test_net_pin2pin():
+    l.log()
     try:
         hal.net("c1.s32out","c2.s32out")
         #TypeError: net: 'c1.s32out' is a pin - first argument must be a signal name
@@ -54,6 +63,7 @@ def test_net_pin2pin():
 
 
 def test_net_existing_signal():
+    l.log()
     hal.newsig("s32", hal.HAL_S32)
 
     assert hal.pins["c1.s32out"].linked == False
@@ -70,6 +80,7 @@ def test_net_existing_signal():
     del hal.signals["s32"]
 
 def test_newsig():
+    l.log()
     floatsig1 = hal.newsig("floatsig1", hal.HAL_FLOAT)
     try:
         hal.newsig("floatsig1", hal.HAL_FLOAT)
@@ -97,6 +108,7 @@ def test_newsig():
 
 
 def test_check_net_args():
+    l.log()
     try:
         hal.net()
     except TypeError:
