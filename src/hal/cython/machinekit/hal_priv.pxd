@@ -2,6 +2,13 @@
 
 from .hal cimport *
 from hal_const cimport hal_type_t, hal_pin_dir_t, hal_param_dir_t
+from rtapi cimport rtapi_heap
+
+cdef extern from "hal_object.h":
+
+    ctypedef struct halhdr_t:
+       pass
+
 
 cdef extern from "hal_priv.h":
     int MAX_EPSILON
@@ -15,42 +22,31 @@ cdef extern from "hal_priv.h":
         hal_float_t f
 
     ctypedef struct hal_pin_t:
-        int next_ptr
+        halhdr_t hdr
         int data_ptr_addr
-        int owner_id
         int signal
         hal_data_u dummysig
-        int oldname
         hal_type_t type
         hal_pin_dir_t dir
-        int handle
         int flags
         unsigned char eps_index
-        char *name
 
     ctypedef struct hal_sig_t:
-        int next_ptr
+        halhdr_t hdr
         int data_ptr
         hal_type_t type
         int readers
         int writers
         int bidirs
-        int handle
-        char *name
 
     ctypedef struct hal_param_t:
-        int next_ptr
+        halhdr_t hdr
         int data_ptr
-        int owner_id
-        int oldname
         hal_type_t type
         hal_param_dir_t dir
-        int handle
-        char *name
 
     ctypedef struct hal_comp_t:
-        int next_ptr
-        int comp_id
+        halhdr_t hdr
         int type
         int state
         long int last_update
@@ -58,7 +54,6 @@ cdef extern from "hal_priv.h":
         long int last_unbound
         int pid
         void *shmem_base
-        char *name
         hal_constructor_t ctor
         hal_destructor_t dtor
         int insmod_args
@@ -66,12 +61,9 @@ cdef extern from "hal_priv.h":
         int userarg2
 
     ctypedef struct hal_inst_t:
-        int next_ptr
-        int comp_id
-        int inst_id
-        int inst_data_dtr
+        halhdr_t hdr
+        int inst_data_ptr
         int inst_size
-        char *name
 
     ctypedef struct hal_funct_args_t:
         long long int thread_start_time
@@ -99,7 +91,7 @@ cdef extern from "hal_priv.h":
         int owner_id
 
     ctypedef struct hal_funct_t:
-        int next_ptr
+        halhdr_t hdr
         int type
         int uses_fp
         int owner_id
@@ -109,11 +101,9 @@ cdef extern from "hal_priv.h":
         hal_funct_t funct
         hal_s32_t runtime
         hal_s32_t maxtime
-        int handle
-        char *name
 
     ctypedef struct hal_thread_t:
-        int next_ptr
+        halhdr_t hdr
         int uses_fp
         long int period
         int priority
@@ -122,52 +112,30 @@ cdef extern from "hal_priv.h":
         hal_s32_t maxtime
         #hal_list_t funct_list
         int cpu_id
-        int handle
-        char *name
 
     ctypedef struct hal_vtable_t:
-        int next_ptr
+        halhdr_t hdr
         int context
-        int comp_id
-        int instance_id
-        int handle
         int refcount
         int version
         void *vtable
-        char *name
 
     ctypedef struct hal_data_t:
         int version
         unsigned long mutex
-        hal_s32_t shmem_avail
         int shmem_bot
         int shmem_top
-
-        int comp_list_ptr
-        int pin_list_ptr
-        int sig_list_ptr
-        int param_list_ptr
-        int funct_list_ptr
-        int thread_list_ptr
-        int vtable_list_ptr
-        int group_list_ptr
-
-        int ring_list_ptr
-        int member_list_ptr
-        int inst_list_ptr
-
-
         long base_period
-        int threads_running
         int exact_base_period
+        int threads_running
         unsigned char lock
         # RTAPI_DECLARE_BITMAP(rings, HAL_MAX_RINGS);
         double *epsilon #[MAX_EPSILON]
-
+        rtapi_heap heap
+        char *arena
 
     hal_data_t *hal_data
     char *hal_shmem_base
-
 
     hal_comp_t *halpr_find_comp_by_name(const char *name)
     hal_pin_t *halpr_find_pin_by_name(const char *name)
@@ -178,10 +146,25 @@ cdef extern from "hal_priv.h":
 
     hal_comp_t *halpr_find_owning_comp(const int owner_id)
 
-    hal_pin_t *halpr_find_pin_by_owner_id(const int owner_id, hal_pin_t * start)
+    hal_pin_t   *halpr_find_pin_by_owner_id(const int owner_id, hal_pin_t * start)
     hal_param_t *halpr_find_param_by_owner_id(const int owner_id, hal_param_t * start)
     hal_funct_t *halpr_find_funct_by_owner_id(const int owner_id, hal_funct_t * start)
 
-    hal_pin_t *halpr_find_pin_by_sig(hal_sig_t * sig, hal_pin_t * start)
-
     hal_inst_t *halpr_find_inst_by_name(const char *name)
+
+    #hal_pin_t *halpr_find_pin_by_sig(hal_sig_t * sig, hal_pin_t * start)
+    ctypedef int (*hal_pin_signal_callback_t)(hal_pin_t *pin,
+                                              hal_sig_t *sig,
+                                              void *user)
+    int halg_foreach_pin_by_signal(const int use_hal_mutex,
+                                   hal_sig_t *sig,
+                                   hal_pin_signal_callback_t cb,
+                                   void *user)
+
+    int halg_inst_create(const int use_hal_mutex,
+                         const char *name,
+                         const int comp_id,
+                         const int size,
+                         void **inst_data)
+
+    int halg_inst_delete(const int use_hal_mutex, const char *name)

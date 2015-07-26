@@ -145,6 +145,9 @@ RTAPI_BEGIN_DECLS
 
 #define HAL_LOCK_ALL      255   /* locks every action */
 
+
+
+
 /***********************************************************************
 *                   GENERAL PURPOSE FUNCTIONS                          *
 ************************************************************************/
@@ -222,12 +225,23 @@ enum comp_state {
 typedef int (*hal_constructor_t) (const char *name, const int argc, const char**argv);
 typedef int (*hal_destructor_t) (const char *name, void *inst, const int inst_size);
 
-int hal_xinit(const int type,
-	      const int userarg1,
-	      const int userarg2,
-	      const hal_constructor_t ctor,
-	      const hal_destructor_t dtor,
-	      const char *name);
+// generic version
+int halg_xinit(const int use_hal_mutex,
+	       const int type,
+	       const int userarg1,
+	       const int userarg2,
+	       const hal_constructor_t ctor,
+	       const hal_destructor_t dtor,
+	       const char *name);
+
+static inline int hal_xinit(const int type,
+			    const int userarg1,
+			    const int userarg2,
+			    const hal_constructor_t ctor,
+			    const hal_destructor_t dtor,
+			    const char *name) {
+    return halg_xinit(1, type, userarg1, userarg2, ctor, dtor, name);
+}
 
 // printf-style version of hal_xinit
 int hal_xinitf(const int type,
@@ -242,94 +256,33 @@ int hal_xinitf(const int type,
 // backwards compatibility:
 static inline int hal_init(const char *name) {
 #ifdef RTAPI
-    return hal_xinit(TYPE_RT, 0, 0, NULL, NULL, name);
+    return halg_xinit(1, TYPE_RT, 0, 0, NULL, NULL, name);
 #else
-    return hal_xinit(TYPE_USER, 0, 0, NULL, NULL, name);
+    return halg_xinit(1, TYPE_USER, 0, 0, NULL, NULL, name);
 #endif
 }
 
+
 #if defined(ULAPI)
-extern int hal_bind(const char *comp);
-extern int hal_unbind(const char *comp);
-extern int hal_acquire(const char *comp, int pid);
-extern int hal_release(const char *comp_name);
+// generic functions (with/without lock)
+extern int halg_bind(const int use_hal_mutex, const char *comp);
+extern int halg_unbind(const int use_hal_mutex, const char *comp);
+extern int halg_acquire(const int use_hal_mutex, const char *comp, int pid);
+extern int halg_release(const int use_hal_mutex, const char *comp);
 
-// introspection support: component and pin iterators
-// These functions are read-only with respect to HAL state.
-
-// The following structs are used to return values,
-// see usage example in hal/remote/reown.c
-
-typedef struct {
-    int type;			/* one of: TYPE_RT, TYPE_USER, TYPE_INSTANCE, TYPE_REMOTE */
-    int state;                  /* one of: COMP_INITIALIZING, COMP_UNBOUND, */
-                                /* COMP_BOUND, COMP_READY */
-    // the next two should be time_t, but kernel wont like them
-    // so fudge it as long int
-    long int last_update;            /* timestamp of last remote update */
-    long int last_bound;             /* timestamp of last bind operation */
-    long int last_unbound;           /* timestamp of last unbind operation */
-    int pid;			/* PID of component (user components only) */
-    char name[HAL_NAME_LEN + 1];	/* component name */
-    int insmod_args;		/* args passed to insmod when loaded */
-} hal_compstate_t;
-
-typedef struct {
-    void **value;
-    int type;		/* data type */
-    int dir;		/* pin direction */
-    char name[HAL_NAME_LEN + 1];	/* pin name */
-    char owner_name[HAL_NAME_LEN + 1];	/* owning comp name */
-    double epsilon;
-    int flags;
-} hal_pinstate_t;
-
-
-// component iterator
-// for each component, call the callback function iff:
-// - a NULL comp_name argument was given:
-//   this will cause all comps to be visited.
-// - a non-null comp_name argument will visit exactly
-//   that component with an exact name match (no prefix matching).
-//
-// cb_data can be used in any fashion and it is not inspected.
-//
-// return value: number of components visited, or error propagated from callback
-//
-// NB: the callback will be called with the RTAPI mutex locked, so dont call
-// hal_retrieve_pinstate from a hal_retrieve_compstate callback!
-
-typedef int(*hal_retrieve_compstate_callback_t)(hal_compstate_t *compstate,  void *cb_data);
-
-// return value:
-extern int hal_retrieve_compstate(const char *comp_name,
-				  hal_retrieve_compstate_callback_t callback,
-				  void *cb_data);
-
-// pin iterator
-// for each pin in component comp_name, call the
-// callback function iff:
-// - a NULL comp_name argument was given: this will
-//   cause all pins of all comps to be visited.
-// - a non-null comp_name argument will visit exactly
-//   that comp with an exact name match (no prefix matching).
-// - if the component was found, 1 is returned, else 0.
-//
-// cb_data can be used in any fashion and it is not inspected.
-// callback return values:
-//    0:   this signals 'continue iterating'
-//    >0:  this signals 'stop iteration and return count'
-//    <0:  this signals an error. Stop iterating and return the error code.
-//
-// if iteration runs to completion and the callback has never returned a
-// non-zero value, hal_retrieve_pinstate returns the number of pins visited.
-//
-// NB: the callback will be called with the RTAPI mutex locked
-
-typedef int(*hal_retrieve_pins_callback_t)(hal_pinstate_t *pinstate,  void *cb_data);
-extern int hal_retrieve_pinstate(const char *comp_name,
-				 hal_retrieve_pins_callback_t callback,
-				 void *cb_data);
+// legacy wrappers
+static inline int hal_bind(const char *comp) {
+    return halg_bind(1, comp);
+}
+static inline  int hal_unbind(const char *comp) {
+    return halg_unbind(1, comp);
+}
+static inline  int hal_acquire(const char *comp, int pid) {
+    return halg_acquire(1, comp, pid);
+}
+static inline  int hal_release(const char *comp) {
+        return halg_release(1, comp);
+}
 #endif
 
 
@@ -350,7 +303,11 @@ extern int hal_retrieve_pinstate(const char *comp_name,
     On success, hal_exit() returns 0, on failure it
     returns a negative error code.
 */
-extern int hal_exit(int comp_id);
+int halg_exit(const int use_hal_mutex, int comp_id);
+
+static inline int hal_exit(int comp_id) {
+    return halg_exit(1,  comp_id);
+}
 
 /** hal_malloc() allocates a block of memory from the main HAL
     shared memory area.  It should be used by all components to
@@ -369,18 +326,26 @@ extern int hal_exit(int comp_id);
     all components completely clears memory and you start
     fresh.
 */
-extern void *hal_malloc(long int size);
+void *halg_malloc(const int use_hal_mutex, size_t size);
+
+static inline void *hal_malloc(size_t size) {
+    return halg_malloc(1, size);
+}
 
 /** hal_ready() indicates that this component is ready.  This allows
     halcmd 'loadusr -W hal_example' to wait until the userspace
     component 'hal_example' is ready before continuing.
 */
-extern int hal_ready(int comp_id);
+int halg_ready(const int use_hal_mutex, int comp_id);
+
+static inline int hal_ready(int comp_id) {
+    return halg_ready(1, comp_id);
+}
 
 /** hal_comp_name() returns the name of the given component, or NULL
     if comp_id is not a loaded component
 */
-extern char* hal_comp_name(int comp_id);
+extern const char* hal_comp_name(int comp_id);
 
 // return the state of a component, or -ENOENT on failure (e.g not existent)
 int hal_comp_state_by_name(const char *name);
@@ -503,33 +468,6 @@ typedef union {
     hal_float_t f;
 } hal_data_u;
 
-// type tags of HAL objects. See also protobuf/proto/types.proto/enum ObjectType
-// which must match:
-typedef enum {
-    HAL_PIN           = 1,
-    HAL_SIGNAL        = 2,
-    HAL_PARAM         = 3,
-    HAL_THREAD        = 4,
-    HAL_FUNCT         = 5,
-    HAL_ALIAS         = 6,
-    HAL_COMP_RT       = 7,
-    HAL_COMP_USER     = 8,
-    HAL_COMP_REMOTE   = 9,
-    HAL_RING          = 10,
-    HAL_GROUP         = 11,
-    HAL_MEMBER_SIGNAL = 12,
-    HAL_MEMBER_GROUP  = 13,
-    HAL_MEMBER_PIN    = 14,
-
-    RING_RECORD       = 16,
-    RING_STREAM       = 17,
-
-    HAL_VTABLE        = 18,
-    HAL_INST          = 19,
-
-    RING_MULTIFRAME   = 20,
-
-} hal_object_type;
 /***********************************************************************
 *                      "LOCKING" FUNCTIONS                             *
 ************************************************************************/
@@ -583,19 +521,39 @@ extern unsigned char hal_get_lock(void);
     On failure they return a negative error code.
 */
 // generic call
-int hal_pin_new(const char *name,
-		const hal_type_t type,
-		const hal_pin_dir_t dir,
-		void **data_ptr_addr,
-		const int owner_id);
+int halg_pin_new(const int use_hal_mutex,
+		 const char *name,
+		 const hal_type_t type,
+		 const hal_pin_dir_t dir,
+		 void **data_ptr_addr,
+		 const int owner_id);
+
+static inline int hal_pin_new(const char *name,
+			      const hal_type_t type,
+			      const hal_pin_dir_t dir,
+			      void **data_ptr_addr,
+			      const int owner_id) {
+    return halg_pin_new(1, name, type,  dir,
+			data_ptr_addr, owner_id);
+}
 
 // printf-style version of hal_pin_new()
 int hal_pin_newf(hal_type_t type,
-		     hal_pin_dir_t dir,
-		     void ** data_ptr_addr,
-		     int owner_id,
-		     const char *fmt, ...)
+		 hal_pin_dir_t dir,
+		 void ** data_ptr_addr,
+		 int owner_id,
+		 const char *fmt, ...)
     __attribute__((format(printf,5,6)));
+
+// generic printf-style version of hal_pin_new()
+int halg_pin_newf(const int use_hal_mutex,
+		  hal_type_t type,
+		  hal_pin_dir_t dir,
+		  void ** data_ptr_addr,
+		  int owner_id,
+		  const char *fmt, ...)
+    __attribute__((format(printf,6,7)));
+
 
 static inline int hal_pin_bit_new(const char *name, hal_pin_dir_t dir,
 				  hal_bit_t ** data_ptr_addr, int owner_id) {
@@ -633,7 +591,7 @@ extern int hal_pin_s32_newf(hal_pin_dir_t dir,
     hal_s32_t ** data_ptr_addr, int owner_id, const char *fmt, ...)
 	__attribute__((format(printf,4,5)));
 
-/** 'hal_pin_new()' creates a new 'pin' object.  It is a generic
+/** 'halg_pin_new()' creates a new 'pin' object.  It is a generic
     version of the eight functions above.  It is provided ONLY for
     those special cases where a generic function is needed.  It is
     STRONGLY recommended that the functions above be used instead,
@@ -645,7 +603,7 @@ extern int hal_pin_s32_newf(hal_pin_dir_t dir,
     the functions above.
     'type' is the hal type of the new pin - the type of data that
     will be passed in/out of the component through the new pin.
-    If successful, hal_pin_new() returns 0.  On failure
+    If successful, halg_pin_new() returns 0.  On failure
     it returns a negative error code.
 */
 
@@ -655,14 +613,6 @@ extern int hal_pin_s32_newf(hal_pin_dir_t dir,
     All pins belonging to a component are removed when the component
     calls 'hal_exit()'.
 */
-
-/** 'hal_pin_alias()' assigns an alternate name, aka an alias, to
-    a pin.  Once assigned, the pin can be referred to by either its
-    original name or the alias.  Calling this function with 'alias'
-    set to NULL will remove any existing alias.
-*/
-extern int hal_pin_alias(const char *pin_name, const char *alias);
-
 
 /***********************************************************************
 *                      "SIGNAL" FUNCTIONS                              *
@@ -685,7 +635,12 @@ extern int hal_pin_alias(const char *pin_name, const char *alias);
     If successful, 'hal_signal_new() returns 0.  On failure
     it returns a negative error code.
 */
-extern int hal_signal_new(const char *name, hal_type_t type);
+int halg_signal_new(const int use_hal_mutex,
+		    const char *name, hal_type_t type);
+
+static inline  int hal_signal_new(const char *name, hal_type_t type) {
+    return halg_signal_new(1, name, type);
+}
 
 /** 'hal_signal_delete()' deletes a signal object.  Any pins linked to
     the object are unlinked.
@@ -693,7 +648,12 @@ extern int hal_signal_new(const char *name, hal_type_t type);
     If successful, 'hal_signal_delete()' returns 0.  On
     failure, it returns a negative error code.
 */
-extern int hal_signal_delete(const char *name);
+
+int halg_signal_delete(const int use_hal_mutex, const char *name);
+
+static inline int hal_signal_delete(const char *name) {
+    return halg_signal_delete(1, name);
+}
 
 /** 'hal_link()' links a pin to a signal.  'pin_name' and 'sig_name' are
     strings containing the pin and signal names.  If the pin is already
@@ -706,14 +666,23 @@ extern int hal_signal_delete(const char *name);
     On success, hal_link() returns 0, on failure it returns a
     negative error code.
 */
-extern int hal_link(const char *pin_name, const char *sig_name);
+int halg_link(const int use_hal_mutex,
+	      const char *pin_name,
+	      const char *sig_name);
+static inline int hal_link(const char *pin_name,
+			   const char *sig_name){
+    return halg_link(1, pin_name, sig_name);
+}
 
 /** 'hal_unlink()' unlinks any signal from the specified pin.  'pin_name'
     is a string containing the pin name.
     On success, hal_unlink() returns 0, on failure it
     returns a negative error code.
 */
-extern int hal_unlink(const char *pin_name);
+int halg_unlink(const int use_hal_mutex, const char *pin_name);
+static inline int hal_unlink(const char *pin_name) {
+    return halg_unlink(1, pin_name);
+}
 
 /***********************************************************************
 *                     "PARAMETER" FUNCTIONS                            *
@@ -865,13 +834,6 @@ extern int hal_param_float_set(const char *name, double value);
 extern int hal_param_u32_set(const char *name, unsigned long value);
 extern int hal_param_s32_set(const char *name, signed long value);
 
-/** 'hal_param_alias()' assigns an alternate name, aka an alias, to
-    a parameter.  Once assigned, the parameter can be referred to by
-    either its original name or the alias.  Calling this function
-    with 'alias' set to NULL will remove any existing alias.
-*/
-extern int hal_param_alias(const char *pin_name, const char *alias);
-
 /** 'hal_param_set()' is a generic function that sets the value of a
     parameter.  It is provided ONLY for those special cases where a
     generic function is needed.  It is STRONGLY recommended that the
@@ -965,6 +927,9 @@ int hal_export_functf(void (*funct) (void *, long),
 extern int hal_create_thread(const char *name, unsigned long period_nsec,
 			     int uses_fp, int cpu_id);
 
+// generic. delete a named thread, or all threads if name == NULL
+int halg_exit_thread(const int use_hal_mutex, const char *name);
+
 /** hal_thread_delete() deletes a realtime thread.
     'name' is the name of the thread, which must have been created
     by 'hal_create_thread()'.
@@ -998,8 +963,11 @@ extern int hal_thread_delete(const char *name);
     only from within user space or init code, not from
     realtime code.
 */
-extern int hal_add_funct_to_thread(const char *funct_name, const char *thread_name,
-    int position);
+extern int hal_add_funct_to_thread(const char *funct_name,
+				   const char *thread_name,
+				   const int position,
+				   const int read_barrier,
+				   const int write_barrier);
 
 /** hal_del_funct_from_thread() removes a function from a thread.
     'funct_name' is the name of the function, as specified in
@@ -1027,17 +995,53 @@ extern int hal_start_threads(void);
 */
 extern int hal_stop_threads(void);
 
+
+// generic vtable methods (locked/unlocked)
+int halg_export_vtable(const int use_hal_mutex,
+		       const char *name,
+		       int version,
+		       void *vtref,
+		       int comp_id);
+int halg_remove_vtable(const int use_hal_mutex, const int vtable_id);
+int halg_reference_vtable(const int use_hal_mutex,
+			 const char *name,
+			 int version,
+			  void **vtableref);
+int halg_unreference_vtable(const int use_hal_mutex, int vtable_id);
+int halg_remove_vtable(const int use_hal_mutex, const int vtable_id);
+
+// returns number of vtables exported by a component.
+int halg_count_exported_vtables(const int use_hal_mutex, const int comp_id);
+
 // returns vtable ID (handle, >0) or error code (< 0)
 // mark as owned by comp comp_id (optional, zero if not owned)
-int hal_export_vtable(const char *name, int version, void *vtable, int comp_id);
-int hal_remove_vtable(int vtable_id);
+static inline int hal_export_vtable(const char *name,
+				    int version,
+				    void *vtable,
+				    int comp_id)
+{
+    return  halg_export_vtable(1, name, version, vtable, comp_id);
+}
+
+static inline int hal_remove_vtable(const int vtable_id)
+{
+    return  halg_remove_vtable(1, vtable_id);
+}
 
 // returns vtable_id (handle) or error code
 // increases refcount
-int hal_reference_vtable(const char *name, int version, void **vtable);
+static inline int hal_reference_vtable(const char *name, int version, void **vtable)
+{
+    return  halg_reference_vtable(1, name, version, vtable);
+}
 
 // drops refcount
-int hal_unreference_vtable(int vtable_id);
+static inline int hal_unreference_vtable(int vtable_id)
+{
+    return  halg_unreference_vtable(1, vtable_id);
+}
+
+
 
 // call a usrfunct.
 // if the return value < 0, this signifies a HAL library error code.
@@ -1054,17 +1058,28 @@ int hal_call_usrfunct(const char *name, const int argc, const char **argv, int *
 // comp_id) is now called owner_id, and can either originate from
 // a hal_init/hal_xinit call, or a hal_inst_create call.
 // returns < 0 on error.
-int hal_inst_create(const char *name,
+int halg_inst_create(const int use_hal_mutex,
+		    const char *name,
 		    const int comp_id,
 		    const int size,
 		    void **inst_data);
+static inline int hal_inst_create(const char *name,
+				  const int comp_id,
+				  const int size,
+				  void **inst_data) {
+    return halg_inst_create(1, name, comp_id, size, inst_data);
+}
 
 // delete a named instance.
 // unlinks & deletes all pins owned by this instance
 // deletes params owned by this instance
 // delf's and deletes functs expored by this instance
 // returns < 0 on error.
-int hal_inst_delete(const char *name);
+int halg_inst_delete(const int use_hal_mutex, const char *name);
+static inline int hal_inst_delete(const char *name) {
+    return halg_inst_delete(1, name);
+}
+
 
 // HAL-specific capabilities. Extend as needed.
 // capabilities are intended to be added to a binary (a.out, .so, .ko)

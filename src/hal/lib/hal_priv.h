@@ -94,7 +94,7 @@
 
 #include <rtapi.h>
 #include <rtapi_global.h>
-#include <hal_logging.h>
+#include "hal_logging.h"
 
 #ifdef ULAPI
 #include <rtapi_compat.h>
@@ -119,6 +119,17 @@ RTAPI_BEGIN_DECLS
 
 // extending this beyond 255 might require adapting rtapi_shmkeys.h
 #define HAL_MAX_RINGS	        255
+
+
+/* These pointers are set by hal_init() to point to the shmem block
+   and to the master data structure. All access should use these
+   pointers, they takes into account the mapping of shared memory
+   into either kernel or user space.  (The HAL kernel module and
+   each HAL user process have their own copy of these vars,
+   initialized to match that process's memory mapping.)
+*/
+
+extern char *hal_shmem_base;
 
 /* SHMPTR(offset) converts 'offset' to a void pointer. */
 #define SHMPTR(offset)  ( (void *)( hal_shmem_base + (offset) ) )
@@ -145,35 +156,76 @@ RTAPI_BEGIN_DECLS
 #define HAL_FABS(a) ((a) > 0.0 ? (a) : -(a))	/* floating absolute value */
 
 /***********************************************************************
+*           opaque forward typedefs for HAL object pointers            *
+************************************************************************/
+struct halhdr;
+struct hal_comp;
+struct hal_inst;
+struct hal_pin;
+struct hal_param;
+struct hal_sig;
+struct hal_group;
+struct hal_member;
+struct hal_funct;
+struct hal_thread;
+struct hal_vtable;
+struct hal_ring;
+
+typedef struct halhdr halhdr_t;
+typedef struct hal_comp hal_comp_t;
+typedef struct hal_inst hal_inst_t;
+typedef struct hal_pin hal_pin_t;
+typedef struct hal_param hal_param_t;
+typedef struct hal_sig hal_sig_t;
+typedef struct hal_group hal_group_t;
+typedef struct hal_member hal_member_t;
+typedef struct hal_funct hal_funct_t;
+typedef struct hal_thread hal_thread_t;
+typedef struct hal_vtable hal_vtable_t;
+typedef struct hal_ring hal_ring_t;
+
+typedef union {
+    halhdr_t     *hdr;
+    hal_comp_t   *comp;
+    hal_inst_t   *inst;
+    hal_pin_t    *pin;
+    hal_param_t  *param;
+    hal_sig_t    *sig;
+    hal_group_t  *group;
+    hal_member_t *member;
+    hal_funct_t  *funct;
+    hal_thread_t *thread;
+    hal_vtable_t *vtable;
+    hal_ring_t   *ring;
+    void         *any;
+} hal_object_ptr;
+
+#define HO_NULL ((hal_object_ptr)NULL)
+
+#include "hal_list.h"    // needs SHMPTR/SHMOFF
+#include "hal_object.h"  // needs hal_list_t
+
+/***********************************************************************
 *            PRIVATE HAL DATA STRUCTURES AND DECLARATIONS              *
 ************************************************************************/
 
+// #define HEAP_EXERCISE
 
-/** HAL "list element" data structure.
-    This structure is used to implement generic double linked circular
-    lists.  Such lists have the following characteristics:
-    1) One "dummy" element that serves as the root of the list.
-    2) 'next' and 'previous' pointers are never NULL.
-    3) Insertion and removal of elements is clean and fast.
-    4) No special case code to deal with empty lists, etc.
-    5) Easy traversal of the list in either direction.
-    This structure has no data, only links.  To use it, include it
-    inside a larger structure.
-*/
-typedef struct {
-    int next;			/* next element in list */
-    int prev;			/* previous element in list */
-} hal_list_t;
+// HAL heap params
+#ifdef HEAP_EXERCISE
 
-/** HAL "oldname" data structure.
-    When a pin or parameter gets an alias, this structure is used to
-    store the original name.
-*/
-typedef struct {
-    int next_ptr;		/* next struct (used for free list only) */
-    char name[HAL_NAME_LEN + 1];	/* the original name */
-} hal_oldname_t;
+// force frequent arena extension
+#define HAL_HEAP_INITIAL     1024
+#define HAL_HEAP_INCREMENT   1024
 
+#else
+
+#define HAL_HEAP_INITIAL     (HAL_SIZE/4)
+#define HAL_HEAP_INCREMENT   (hal_freemem() / 2)
+#endif
+
+#define HAL_HEAP_MINFREE      (1024)   // shmem_top - shmem_bot
+#define HAL_ARENA_ALIGN 16
 
 /* Master HAL data structure
    There is a single instance of this structure in the machine.
@@ -186,73 +238,67 @@ typedef struct {
 typedef struct {
     int version;		/* version code for structs, etc */
     unsigned long mutex;	/* protection for linked lists, etc. */
-
-    hal_s32_t shmem_avail;	/* amount of shmem left free */
-
     int shmem_bot;		/* bottom of free shmem (first free byte) */
     int shmem_top;		/* top of free shmem (1 past last free) */
-    int comp_list_ptr;		/* root of linked list of components */
-    int pin_list_ptr;		/* root of linked list of pins */
-    int sig_list_ptr;		/* root of linked list of signals */
-    int param_list_ptr;		/* root of linked list of parameters */
-    int funct_list_ptr;		/* root of linked list of functions */
-    int thread_list_ptr;	/* root of linked list of threads */
-    int vtable_list_ptr;	        /* root of linked list of vtables */
+
+    hal_list_t halobjects;       // list of all named HAL objects
+    hal_list_t threads;          // list of threads in ascending priority
+    hal_list_t funct_entry_free; // list of free funct entry structs
 
     long base_period;		/* timer period for realtime tasks */
-    int threads_running;	/* non-zero if threads are started */
-    int oldname_free_ptr;	/* list of free oldname structs */
-    int comp_free_ptr;		/* list of free component structs */
-    int pin_free_ptr;		/* list of free pin structs */
-    int sig_free_ptr;		/* list of free signal structs */
-    int param_free_ptr;		/* list of free parameter structs */
-    int funct_free_ptr;		/* list of free function structs */
-    hal_list_t funct_entry_free;	/* list of free funct entry structs */
-    int thread_free_ptr;	/* list of free thread structs */
-    int vtable_free_ptr;   	/* list of free vtable structs */
     int exact_base_period;      /* if set, pretend that rtapi satisfied our
 				   period request exactly */
+
+    int threads_running;	/* non-zero if threads are started */
+
     unsigned char lock;         /* hal locking, can be one of the HAL_LOCK_* types */
 
     // since rings are realy just glorified named shm segments, allocate by map
     // this gets around the unexposed rtapi_data segment in userland flavors
     RTAPI_DECLARE_BITMAP(rings, HAL_MAX_RINGS);
 
-    int group_list_ptr;	        /* list of group structs */
-    int group_free_ptr;	        /* list of free group structs */
-
-    int ring_list_ptr;          /* list of ring structs */
-    int ring_free_ptr;          /* list of free ring structs */
-
-    int member_list_ptr;	/* list of member structs */
-    int member_free_ptr;	/* list of free member structs */
-
-    int inst_list_ptr;          // list of active instance descriptors
-    int inst_free_ptr;          // list of freed instance descriptors
-
     double epsilon[MAX_EPSILON];
+
+    // HAL heap for shmalloc_desc()
+    struct rtapi_heap heap;
+    unsigned char arena[0] __attribute__((aligned(HAL_ARENA_ALIGN)));
+    // heap grows from here
+
 } hal_data_t;
 
+
+/* This pointer is set by hal_init() to point to the  master data structure.
+   All access should use these
+   pointers, they takes into account the mapping of shared memory
+   into either kernel or user space.  */
+
+extern hal_data_t *hal_data;
+
+static inline size_t hal_freemem(void) {
+    if (hal_data == NULL)
+	return 0;
+    return hal_data->shmem_top - hal_data->shmem_bot;
+}
 
 /** HAL 'component' data structure.
     This structure contains information that is unique to a HAL component.
     An instance of this structure is added to a linked list when the
     component calls hal_init().
 */
-typedef struct {
-    int next_ptr;		/* next component in the list */
-    int comp_id;		/* component ID (RTAPI module id) */
-    int type;			/* one of: TYPE_RT, TYPE_USER, TYPE_INSTANCE, TYPE_REMOTE */
-    int state;                  /* one of: COMP_INITIALIZING, COMP_UNBOUND, */
+typedef struct hal_comp {
+    halhdr_t hdr;		// common HAL object header
+    int type  : 8;              // subtype, one of:
+                                // TYPE_RT, TYPE_USER, TYPE_INSTANCE, TYPE_REMOTE
+    int state : 8;              /* one of: COMP_INITIALIZING, COMP_UNBOUND, */
                                 /* COMP_BOUND, COMP_READY */
+    void *shmem_base;           /* base of shmem for this component */
+
     // the next two should be time_t, but kernel wont like them
     // so fudge it as long int
     long int last_update;            /* timestamp of last remote update */
     long int last_bound;             /* timestamp of last bind operation */
     long int last_unbound;           /* timestamp of last unbind operation */
     int pid;			     /* PID of component (user components only) */
-    void *shmem_base;           /* base of shmem for this component */
-    char name[HAL_NAME_LEN + 1];     /* component name */
 
     hal_constructor_t ctor;     // NULL for non-instatiable legacy comps
     hal_destructor_t dtor;      // may be NULL for a default destructor
@@ -268,31 +314,24 @@ typedef struct {
 // An instance has a name, and a unique ID
 // it is owned by exactly one component pointed to by comp_ptr
 // it holds a void * to the instance data as required by the instance
-typedef struct {
-    int next_ptr;		// next instance in list
-    int comp_id;                // owning component
-    int inst_id;                // allocated by rtapi_next_handle()
+typedef struct hal_inst {
+    halhdr_t hdr;		// common HAL object header
     int inst_data_ptr;          // offset of instance data in HAL shm segment
     int inst_size;              // size of instdata blob
-    char name[HAL_NAME_LEN+1];  // well, the name
 } hal_inst_t;
 
 /** HAL 'pin' data structure.
     This structure contains information about a 'pin' object.
 */
-typedef struct {
-    int next_ptr;		/* next pin in linked list */
+typedef struct hal_pin {
+    halhdr_t hdr;		// common HAL object header
     int data_ptr_addr;		/* address of pin data pointer */
-    int owner_id;		/* component that owns this pin */
     int signal;			/* signal to which pin is linked */
     hal_data_u dummysig;	/* if unlinked, data_ptr points here */
-    int oldname;		/* old name if aliased, else zero */
     hal_type_t type;		/* data type */
     hal_pin_dir_t dir;		/* pin direction */
-    int handle;                 // unique ID
     int flags;
     __u8 eps_index;
-    char name[HAL_NAME_LEN + 1];	/* pin name */
 } hal_pin_t;
 
 typedef enum {
@@ -302,29 +341,23 @@ typedef enum {
 /** HAL 'signal' data structure.
     This structure contains information about a 'signal' object.
 */
-typedef struct {
-    int next_ptr;		/* next signal in linked list */
+typedef struct hal_sig {
+    halhdr_t hdr;		// common HAL object header
     int data_ptr;		/* offset of signal value */
     hal_type_t type;		/* data type */
     int readers;		/* number of input pins linked */
     int writers;		/* number of output pins linked */
     int bidirs;			/* number of I/O pins linked */
-    int handle;                // unique ID
-    char name[HAL_NAME_LEN + 1];	/* signal name */
 } hal_sig_t;
 
 /** HAL 'parameter' data structure.
     This structure contains information about a 'parameter' object.
 */
-typedef struct {
-    int next_ptr;		/* next parameter in linked list */
+typedef struct hal_param {
+    halhdr_t hdr;		// common HAL object header
     int data_ptr;		/* offset of parameter value */
-    int owner_id;		/* component that owns this signal */
-    int oldname;		/* old name if aliased, else zero */
     hal_type_t type;		/* data type */
     hal_param_dir_t dir;	/* data direction */
-    int handle;                // unique ID
-    char name[HAL_NAME_LEN + 1];	/* parameter name */
 } hal_param_t;
 
 
@@ -377,7 +410,7 @@ typedef struct hal_funct  hal_funct_t;
 
 // keeps values pertaining to thread invocation in a struct,
 // so a reference can be cheaply passed to the invoked funct
-typedef struct {
+typedef struct hal_funct_args {
     // actual invocation time of this thread cycle
     // (i.e. before calling the first funct in chain)
     long long int thread_start_time;
@@ -409,7 +442,7 @@ typedef union {
 } hal_funct_u;
 
 // hal_export_xfunc argument struct
-typedef struct {
+typedef struct hal_export_xfunct_args {
     hal_funct_signature_t type;
     hal_funct_u funct;
     void *arg;
@@ -420,32 +453,32 @@ typedef struct {
 
 int hal_export_xfunctf( const hal_export_xfunct_args_t *xf, const char *fmt, ...);
 
-typedef struct hal_funct {
-    int next_ptr;		/* next function in linked list */
-    hal_funct_signature_t type; // drives call signature, addf
-    int uses_fp;		/* floating point flag */
-    int owner_id;		/* component that added this funct */
-    int reentrant;		/* non-zero if function is re-entrant */
-    int users;			/* number of threads using function */
+ typedef struct hal_funct {
+    halhdr_t hdr;
     void *arg;			/* argument for function */
     hal_funct_u funct;          // ptr to function code
-    int handle;                 // unique ID
+    hal_funct_signature_t type; // drives call signature, addf
     hal_s32_t* runtime;	        /* (pin) duration of last run, in nsec */
     hal_s32_t maxtime;		/* duration of longest run, in nsec */
     hal_bit_t maxtime_increased;	/* on last call, maxtime increased */
-    char name[HAL_NAME_LEN + 1];	/* function name */
+    int uses_fp;		/* floating point flag */
+    int reentrant;		/* non-zero if function is re-entrant */
+    int users;			/* number of threads using function */
 } hal_funct_t;
 
-typedef struct {
+typedef struct hal_funct_entry {
     hal_list_t links;		/* linked list data */
-    hal_funct_signature_t type;
+    __u8 rmb;                   // issue a read barrier before calling this funct
+    __u8 wmb;                   // issue a write barrier after calling this funct
+    __u8 type;
+    __u8 spare;
     void *arg;			/* argument for function */
-    hal_funct_u funct;     // ptr to function code
+    hal_funct_u funct;          // ptr to function code
     int funct_ptr;		/* pointer to function */
 } hal_funct_entry_t;
 
 typedef struct hal_thread {
-    int next_ptr;		/* next thread in linked list */
+    halhdr_t hdr;
     int uses_fp;		/* floating point flag */
     long int period;		/* period of the thread, in nsec */
     int priority;		/* priority of the thread */
@@ -453,9 +486,9 @@ typedef struct hal_thread {
     hal_s32_t runtime;		/* duration of last run, in nsec */
     hal_s32_t maxtime;		/* duration of longest run, in nsec */
     hal_list_t funct_list;	/* list of functions to run */
+    hal_list_t thread;          // list of threads in ascending priority
+                                // root: hal_data.threads
     int cpu_id;                 /* cpu to bind on, or -1 */
-    int handle;                 // unique ID
-    char name[HAL_NAME_LEN + 1];	/* thread name */
 } hal_thread_t;
 
 
@@ -476,10 +509,13 @@ static inline long fa_period(const hal_funct_args_t *fa)
 static inline const char* fa_thread_name(const hal_funct_args_t *fa)
 {
     if (fa->thread)
-	return fa->thread->name;
+	return ho_name(fa->thread);
     return "";
 }
-static inline const char* fa_funct_name(const hal_funct_args_t *fa) { return fa->funct->name; }
+static inline const char* fa_funct_name(const hal_funct_args_t *fa)
+{
+    return ho_name(fa->funct);
+}
 
 static inline const int fa_argc(const hal_funct_args_t *fa) { return fa->argc; }
 static inline const char** fa_argv(const hal_funct_args_t *fa) { return fa->argv; }
@@ -487,15 +523,11 @@ static inline const void * fa_arg(const hal_funct_args_t *fa) { return fa->funct
 
 
 // represents a HAL vtable object
-typedef struct {
-    int next_ptr;		   // next vtable in linked list
+typedef struct hal_vtable {
+    halhdr_t hdr;		   // common HAL object header
     int context;                   // 0 for RT, pid for userland
-    int comp_id;                   // optional owning comp reference, 0 if unused
-    int handle;                    // unique ID
-    int refcount;                  // prevents unloading while referenced
     int version;                   // tags switchs struct version
     void *vtable;     // pointer to vtable (valid in loading context only)
-    char name[HAL_NAME_LEN + 1];   // vtable name
 } hal_vtable_t;
 
 
@@ -521,41 +553,86 @@ typedef struct {
    meaningfull error messages in case of a mismatch.
 */
 #include "rtapi_shmkeys.h"
-#define HAL_VER   0x0000000C	/* version code */
+#define HAL_VER   13	/* version code */
 
-/* These pointers are set by hal_init() to point to the shmem block
-   and to the master data structure. All access should use these
-   pointers, they takes into account the mapping of shared memory
-   into either kernel or user space.  (The HAL kernel module and
-   each HAL user process have their own copy of these vars,
-   initialized to match that process's memory mapping.)
-*/
-
-extern char *hal_shmem_base;
-extern hal_data_t *hal_data;
 
 /***********************************************************************
 *            PRIVATE HAL FUNCTIONS - NOT PART OF THE API               *
 ************************************************************************/
 
-/** None of these functions get or release any mutex.  They all assume
+/** the legacy halpr functions do not get or release any mutex.  They all assume
     that the mutex has already been obtained.  Calling them without
     having the mutex may give incorrect results if other processes are
     accessing the data structures at the same time.
+
+    The underlying halg_ generic functions have a use_hal_mutex parameter
+    to conditionally use the HAL lock.
 */
 
+// generic lookup by name
+hal_object_ptr halg_find_object_by_name(const int use_hal_mutex,
+					const int type,
+					const char *name);
+// generic lookup by ID
+hal_object_ptr halg_find_object_by_id(const int use_hal_mutex,
+				      const int type,
+				      const int id);
 
 /** The 'find_xxx_by_name()' functions search the appropriate list for
     an object that matches 'name'.  They return a pointer to the object,
     or NULL if no matching object is found.
 */
-extern hal_comp_t *halpr_find_comp_by_name(const char *name);
-extern hal_pin_t *halpr_find_pin_by_name(const char *name);
-extern hal_sig_t *halpr_find_sig_by_name(const char *name);
-extern hal_param_t *halpr_find_param_by_name(const char *name);
-extern hal_thread_t *halpr_find_thread_by_name(const char *name);
-extern hal_funct_t *halpr_find_funct_by_name(const char *name);
-extern hal_inst_t *halpr_find_inst_by_name(const char *name);
+static inline hal_thread_t *halpr_find_thread_by_name(const char *name){
+    return halg_find_object_by_name(0, HAL_THREAD, name).thread;
+}
+
+static inline  hal_comp_t *halpr_find_comp_by_name(const char *name) {
+    return halg_find_object_by_name(0, HAL_COMPONENT, name).comp;
+}
+
+static inline  hal_sig_t *halpr_find_sig_by_name(const char *name) {
+    return halg_find_object_by_name(0, HAL_SIGNAL, name).sig;
+}
+
+static inline hal_funct_t *halpr_find_funct_by_name(const char *name) {
+    return halg_find_object_by_name(0, HAL_FUNCT, name).funct;
+}
+
+static inline hal_inst_t *halpr_find_inst_by_name(const char *name) {
+    return halg_find_object_by_name(0, HAL_INST, name).inst;
+}
+
+static inline  hal_param_t *halpr_find_param_by_name(const char *name) {
+    return halg_find_object_by_name(0, HAL_PARAM, name).param;
+}
+
+static inline hal_pin_t *halpr_find_pin_by_name(const char *name) {
+    return halg_find_object_by_name(0, HAL_PIN, name).pin;
+}
+
+hal_vtable_t *halg_find_vtable_by_name(const int use_hal_mutex,
+				       const char *name,
+				       const int version);
+static inline hal_vtable_t *halpr_find_vtable_by_name(const char *name,
+						      const int version) {
+    return halg_find_vtable_by_name(0, name, version);
+}
+
+/** The 'find_xxx_by_ID()' functions search for
+    an object that matches 'name'.  They return a pointer to the object,
+    or NULL if no matching object is found.
+*/
+/** 'find_comp_by_id()' searches for an object whose
+    component ID matches 'id'.  It returns a pointer to that component,
+    or NULL if no match is found.
+*/
+
+static inline hal_comp_t *halpr_find_comp_by_id(const int id) {
+    return halg_find_object_by_id(0, HAL_COMPONENT, id).comp;
+}
+static inline hal_vtable_t *halpr_find_vtable_by_id(const int id) {
+    return halg_find_object_by_id(0, HAL_VTABLE, id).vtable;
+}
 
 // observers needed in haltalk
 // I guess we better come up with generic iterators for this kind of thing
@@ -571,25 +648,10 @@ hal_pin_t *
 hal_find_pin_by_name(const char *name);
 
 /** Allocates a HAL component structure */
-extern hal_comp_t *halpr_alloc_comp_struct(void);
+// extern hal_comp_t *halpr_alloc_comp_struct(void);
 
-/** 'find_comp_by_id()' searches the component list for an object whose
-    component ID matches 'id'.  It returns a pointer to that component,
-    or NULL if no match is found.
-*/
-extern hal_comp_t *halpr_find_comp_by_id(int id);
 
-/** 'find_pin_by_sig()' finds pin(s) that are linked to a specific signal.
-    If 'start' is NULL, it starts at the beginning of the pin list, and
-    returns the first pin that is linked to 'sig'.  Otherwise it assumes
-    that 'start' is the value returned by a previous call, and it returns
-    the next matching pin.  If no match is found, it returns NULL
-*/
-extern hal_pin_t *halpr_find_pin_by_sig(hal_sig_t * sig, hal_pin_t * start);
 
-// vtable private API:
-hal_vtable_t *halpr_find_vtable_by_name(const char *name, int version);
-hal_vtable_t *halpr_find_vtable_by_id(int vtable_id);
 
 // private instance API:
 
@@ -597,7 +659,11 @@ hal_vtable_t *halpr_find_vtable_by_id(int vtable_id);
 // find the owning instance
 // succeeds only for pins, params, functs owned by a hal_inst_t
 // returns NULL for legacy code using comp_id for pins/params/functs
-hal_inst_t *halpr_find_inst_by_id(const int owner_id);
+
+/* hal_inst_t *halg_find_inst_by_id(const int use_hal_mutex, */
+/* 				 const int id); */
+static inline hal_inst_t *halpr_find_inst_by_id(const int id)
+{ return halg_find_object_by_id(0, HAL_INST, id).inst; }
 
 // given the owner_id of pin, param or funct,
 // find the owning component regardless whether the object
@@ -605,22 +671,37 @@ hal_inst_t *halpr_find_inst_by_id(const int owner_id);
 // always succeeds for pins, params, functs
 hal_comp_t *halpr_find_owning_comp(const int owner_id);
 
-// iterators - by instance id
-hal_pin_t *halpr_find_pin_by_instance_id(const int inst_id,
-					 const hal_pin_t * start);
-hal_param_t *halpr_find_param_by_instance_id(const int inst_id,
-					     const hal_param_t * start);
-hal_funct_t *halpr_find_funct_by_instance_id(const int inst_id,
-					     const hal_funct_t * start);
+/* // iterators - by instance id */
+/* hal_pin_t *halpr_find_pin_by_instance_id(const int inst_id, */
+/* 					 const hal_pin_t * start); */
+/* hal_param_t *halpr_find_param_by_instance_id(const int inst_id, */
+/* 					     const hal_param_t * start); */
+/* hal_funct_t *halpr_find_funct_by_instance_id(const int inst_id, */
+/* 					     const hal_funct_t * start); */
 
 // iterate over insts owned by a particular comp.
 // if comp_id < 0, return ALL instances, regardless which comp owns them.
-hal_inst_t *halpr_find_inst_by_owning_comp(const int comp_id, hal_inst_t *start);
+// hal_inst_t *halpr_find_inst_by_owning_comp(const int comp_id, hal_inst_t *start);
 
 // iterators - by owner id, which can refer to either a comp or an instance
 hal_pin_t *halpr_find_pin_by_owner_id(const int owner_id, hal_pin_t * start);
-hal_param_t *halpr_find_param_by_owner_id(const int owner_id, hal_param_t * start);
+// hal_param_t *halpr_find_param_by_owner_id(const int owner_id, hal_param_t * start);
 hal_funct_t *halpr_find_funct_by_owner_id(const int owner_id, hal_funct_t * start);
+
+
+// callback return value convention applies
+typedef int (*hal_pin_signal_callback_t)(hal_pin_t *pin,
+					 hal_sig_t *sig,
+					 void *user);
+
+// 'halg_foreach_pin_by_signal' finds pin(s) that are linked to a specific signal.
+// the callback is executed for each pin linked to sig.
+// any user-specific argumens can be passed via 'user'
+int halg_foreach_pin_by_signal(const int use_hal_mutex,
+			       hal_sig_t *sig,
+			       hal_pin_signal_callback_t cb,
+			       void *user);
+
 
 // automatically release the local hal_data->mutex on scope exit.
 // if a local variable is declared like so:
@@ -631,6 +712,7 @@ hal_funct_t *halpr_find_funct_by_owner_id(const int owner_id, hal_funct_t * star
 // see http://git.mah.priv.at/gitweb?p=emc2-dev.git;a=shortlog;h=refs/heads/hal-lock-unlock
 // NB: make sure the mutex is actually held in the using code when leaving scope!
 void halpr_autorelease_mutex(void *variable);
+void halpr_autorelease_mutex_if(void *variable);
 
 
 // scope protection macro for simplified usage
@@ -640,40 +722,39 @@ void halpr_autorelease_mutex(void *variable);
 //    .. in criticial region
 //    any scope exit will release the HAL mutex
 // }
+//
+// conditional scope protection based on parameter:
+// <lock> must yield an int value (passed in from outer scope)
+// use like so:
+//
+// int use_lock = 1;
+// int no_lock = 0;
+//
+// { // enters a criticial region since use_lock is nonzero:
+//    WITH_HAL_MUTEX_IF(use_lock);
+//    .. in criticial region
+//    any scope exit will release the HAL mutex
+// }
+//
+// { // does NOT enter a criticial region since no_lock is zero:
+//    WITH_HAL_MUTEX_IF(no_lock);
+//    .. not protected by hal_mutex
+//    any scope exit will leave the HAL mutex untouched
+// }
+
 #ifndef __PASTE
 #define __PASTE(a,b)	a##b
 #endif
-#define _WITH_HAL_MUTEX(unique)						\
+
+#define _WITH_HAL_MUTEX_IF(unique, cond)				\
     int __PASTE(__scope_protector_,unique)				\
-	 __attribute__((cleanup(halpr_autorelease_mutex)));		\
-	 rtapi_mutex_get(&(hal_data->mutex));
+	 __attribute__((cleanup(halpr_autorelease_mutex_if))) = cond;	\
+    if (cond) rtapi_mutex_get(&(hal_data->mutex));
 
-#define WITH_HAL_MUTEX() _WITH_HAL_MUTEX(__LINE__)
+#define WITH_HAL_MUTEX_IF(intval) _WITH_HAL_MUTEX_IF(__LINE__, intval)
+#define WITH_HAL_MUTEX() _WITH_HAL_MUTEX_IF(__LINE__, 1)
 
 
-
-/** The 'shmalloc_xx()' functions allocate blocks of shared memory.
-    Each function allocates a block that is 'size' bytes long.
-    If 'size' is 3 or more, the block is aligned on a 4 byte
-    boundary.  If 'size' is 2, it is aligned on a 2 byte boundary,
-    and if 'size' is 1, it is unaligned.
-    These functions do not test a mutex - they are called from
-    within the hal library by code that already has the mutex.
-    (The public function 'hal_malloc()' is a wrapper that gets the
-    mutex and then calls 'shmalloc_up()'.)
-    The only difference between the two functions is the location
-    of the allocated memory.  'shmalloc_up()' allocates from the
-    base of shared memory and works upward, while 'shmalloc_dn()'
-    starts at the top and works down.
-    This is done to improve realtime performance.  'shmalloc_up()'
-    is used to allocate data that will be accessed by realtime
-    code, while 'shmalloc_dn()' is used to allocate the much
-    larger structures that are accessed only occaisionally during
-    init.  This groups all the realtime data together, inproving
-    cache performance.
-*/
-
-#include "hal_list.h"
 
 RTAPI_END_DECLS
 #endif /* HAL_PRIV_H */

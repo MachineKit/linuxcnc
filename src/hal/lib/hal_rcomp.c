@@ -18,14 +18,14 @@
 #include <stdlib.h>		/* exit() */
 #include "rtapi/shmdrv/shmdrv.h"
 
-int hal_bind(const char *comp_name)
+int halg_bind(const int use_hal_mutex, const char *comp_name)
 {
     CHECK_HALDATA();
     CHECK_STRLEN(comp_name, HAL_NAME_LEN);
     {
-	hal_comp_t *comp __attribute__((cleanup(halpr_autorelease_mutex)));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
 
-	rtapi_mutex_get(&(hal_data->mutex));
+	hal_comp_t *comp;
 	comp = halpr_find_comp_by_name(comp_name);
 
 	if (comp == NULL) {
@@ -48,14 +48,13 @@ int hal_bind(const char *comp_name)
     return 0;
 }
 
-int hal_unbind(const char *comp_name)
+int halg_unbind(const int use_hal_mutex, const char *comp_name)
 {
     CHECK_HALDATA();
     CHECK_STRLEN(comp_name, HAL_NAME_LEN);
     {
-	hal_comp_t *comp __attribute__((cleanup(halpr_autorelease_mutex)));
-
-	rtapi_mutex_get(&(hal_data->mutex));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
+	hal_comp_t *comp;
 
 	comp = halpr_find_comp_by_name(comp_name);
 	if (comp == NULL) {
@@ -78,16 +77,15 @@ int hal_unbind(const char *comp_name)
     return 0;
 }
 
-int hal_acquire(const char *comp_name, int pid)
+int halg_acquire(const int use_hal_mutex, const char *comp_name, int pid)
 {
     CHECK_HALDATA();
     CHECK_STRLEN(comp_name, HAL_NAME_LEN);
     {
-	hal_comp_t *comp __attribute__((cleanup(halpr_autorelease_mutex)));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
+	hal_comp_t *comp;
 
-	rtapi_mutex_get(&(hal_data->mutex));
 	comp = halpr_find_comp_by_name(comp_name);
-
 	if (comp == NULL) {
 	    HALERR("no such component '%s'", comp_name);
 	    return -EINVAL;
@@ -113,20 +111,20 @@ int hal_acquire(const char *comp_name, int pid)
 		return -EINVAL;
 	    }
 	comp->pid = pid;
-	return comp->comp_id;
+	ho_incref(comp); // prevent deletion
+	return ho_id(comp);
     }
 }
 
-int hal_release(const char *comp_name)
+int halg_release(const int use_hal_mutex, const char *comp_name)
 {
     CHECK_HALDATA();
     CHECK_STRLEN(comp_name, HAL_NAME_LEN);
     {
-	hal_comp_t *comp __attribute__((cleanup(halpr_autorelease_mutex)));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
+	hal_comp_t *comp;
 
-	rtapi_mutex_get(&(hal_data->mutex));
 	comp = halpr_find_comp_by_name(comp_name);
-
 	if (comp == NULL) {
 	    HALERR("no such component '%s'", comp_name);
 	    return -EINVAL;
@@ -148,154 +146,31 @@ int hal_release(const char *comp_name)
 	    // return -EINVAL;
 	}
 	comp->pid = 0;
+	ho_decref(comp); // enable deletion if last ref
     }
     return 0;
 }
 
-// introspection support for remote components.
-
-int hal_retrieve_compstate(const char *comp_name,
-			   hal_retrieve_compstate_callback_t callback,
-			   void *cb_data)
+static int count_pins_and_tracked_pins(hal_object_ptr o, foreach_args_t *args)
 {
-    int next;
-    int nvisited = 0;
-    int result;
-    hal_compstate_t state;
-
-    CHECK_HALDATA();
-    {
-	hal_comp_t *comp  __attribute__((cleanup(halpr_autorelease_mutex)));
-
-	/* get mutex before accessing shared data */
-	rtapi_mutex_get(&(hal_data->mutex));
-
-	/* search for the comp */
-	next = hal_data->comp_list_ptr;
-	while (next != 0) {
-	    comp = SHMPTR(next);
-	    if (!comp_name || (strcmp(comp->name, comp_name)) == 0) {
-		nvisited++;
-		/* this is the right comp */
-		if (callback) {
-		    // fill in the details:
-		    state.type = comp->type;
-		    state.state = comp->state;
-		    state.last_update = comp->last_update;
-		    state.last_bound = comp->last_bound;
-		    state.last_unbound = comp->last_unbound;
-		    state.pid = comp->pid;
-		    state.insmod_args = comp->insmod_args;
-		    strncpy(state.name, comp->name, sizeof(comp->name));
-
-		    result = callback(&state, cb_data);
-		    if (result < 0) {
-			// callback signaled an error, pass that back up.
-			return result;
-		    } else if (result > 0) {
-			// callback signaled 'stop iterating'.
-			// pass back the number of visited comps so far.
-			return nvisited;
-		    } else {
-			// callback signaled 'OK to continue'
-			// fall through
-		    }
-		} else {
-		    // null callback passed in,
-		    // just count comps
-		    // nvisited already bumped above.
-		}
-	    }
-	    /* no match, try the next one */
-	    next = comp->next_ptr;
-	}
-	// hal_print_msg(RTAPI_MSG_DBG,
-	//		"HAL: hal_retrieve_compstate: visited %d comps", nvisited);
-	/* if we get here, we ran through all the comps, so return count */
-	return nvisited;
-    }
+    args->user_arg1++;     // pin count
+    if (!(o.pin->flags & PIN_DO_NOT_TRACK))
+	args->user_arg2++; // pins tracked
+    return 0;
 }
 
-int hal_retrieve_pinstate(const char *comp_name,
-			  hal_retrieve_pins_callback_t callback,
-			  void *cb_data)
+static int fill_pin_array(hal_object_ptr o, foreach_args_t *args)
 {
-    int next;
-    int nvisited = 0;
-    int result;
-    hal_comp_t *comp = NULL;
-    hal_comp_t *owner;
-    hal_pinstate_t pinstate;
-
-    CHECK_HALDATA();
-    CHECK_STRLEN(comp_name, HAL_NAME_LEN);
-
-    {
-	hal_pin_t *pin __attribute__((cleanup(halpr_autorelease_mutex)));
-
-	/* get mutex before accessing shared data */
-	rtapi_mutex_get(&(hal_data->mutex));
-
-	if (comp_name != NULL) {
-	    comp = halpr_find_comp_by_name(comp_name);
-	    if (comp == NULL) {
-		HALERR("no such component '%s'", comp_name);
-		return -EINVAL;
-	    }
-	}
-	// either comp == NULL, so visit all pins
-	// or comp != NULL, in which case visit only this
-	// component's pins
-
-	// walk the pinlist
-	next = hal_data->pin_list_ptr;
-	while (next != 0) {
-	    pin = SHMPTR(next);
-	    owner = halpr_find_owning_comp(pin->owner_id);
-	    if (!comp_name || (owner->comp_id == comp->comp_id)) {
-		nvisited++;
-		/* this is the right comp */
-		if (callback) {
-		    // fill in the details:
-		    // NB: cover remote link case!
-		    pinstate.value = SHMPTR(pin->data_ptr_addr);
-		    pinstate.type = pin->type;
-		    pinstate.dir = pin->dir;
-		    pinstate.epsilon = hal_data->epsilon[pin->eps_index];
-		    pinstate.flags = pin->flags;
-		    strncpy(pinstate.name, pin->name, sizeof(pin->name));
-		    strncpy(pinstate.owner_name, owner->name, sizeof(owner->name));
-
-		    result = callback(&pinstate, cb_data);
-		    if (result < 0) {
-			// callback signaled an error, pass that back up.
-			return result;
-		    } else if (result > 0) {
-			// callback signaled 'stop iterating'.
-			// pass back the number of visited pins so far.
-			return nvisited;
-		    } else {
-			// callback signaled 'OK to continue'
-			// fall through
-		    }
-		} else {
-		    // null callback passed in,
-		    // just count pins
-		    // nvisited already bumped above.
-		}
-	    }
-	    /* no match, try the next one */
-	    next = pin->next_ptr;
-	}
-	HALDBG("hal_retrieve_pinstate: visited %d pins", nvisited);
-	/* if we get here, we ran through all the pins, so return count */
-	return nvisited;
-    }
+    hal_compiled_comp_t *tc = args->user_ptr1;
+    if (!(o.pin->flags & PIN_DO_NOT_TRACK))
+	tc->pin[args->user_arg1++] = o.pin;
+    return 0;
 }
 
 // component reporting support
-
-int hal_compile_comp(const char *name, hal_compiled_comp_t **ccomp)
+int halg_compile_comp(const int use_hal_mutex,
+		      const char *name,
+		      hal_compiled_comp_t **ccomp)
 {
    hal_compiled_comp_t *tc;
    int pincount = 0;
@@ -303,12 +178,10 @@ int hal_compile_comp(const char *name, hal_compiled_comp_t **ccomp)
    CHECK_HALDATA();
    CHECK_STRLEN(name, HAL_NAME_LEN);
    {
-       hal_comp_t *comp __attribute__((cleanup(halpr_autorelease_mutex)));
-       int next, n;
-       hal_comp_t *owner;
-       hal_pin_t *pin;
+       WITH_HAL_MUTEX_IF(use_hal_mutex);
 
-       rtapi_mutex_get(&(hal_data->mutex));
+       hal_comp_t *comp;
+       int n;
 
        if ((comp = halpr_find_comp_by_name(name)) == NULL) {
 	    HALERR("no such component '%s'", name);
@@ -316,18 +189,18 @@ int hal_compile_comp(const char *name, hal_compiled_comp_t **ccomp)
        }
 
        // array sizing: count pins owned by this component
-       next = hal_data->pin_list_ptr;
-       n = 0;
-       while (next != 0) {
-	    pin = SHMPTR(next);
-	    owner = halpr_find_owning_comp(pin->owner_id);
-	    if (owner->comp_id == comp->comp_id) {
-		if (!(pin->flags & PIN_DO_NOT_TRACK))
-		    n++;
-		pincount++;
-	    }
-	    next = pin->next_ptr;
-       }
+       // and how many of them are to be tracked
+       foreach_args_t args =  {
+	   .type = HAL_PIN,
+	   // technically rcomps are legacy (not instantiable)
+	   // so match on owner_id instead of owning_comp
+	   // since all pins directly owned by comp, not an inst
+	   .owner_id = ho_id(comp),
+       };
+       halg_foreach(0, &args, count_pins_and_tracked_pins);
+       pincount = args.user_arg1;
+       n = args.user_arg2;
+
        if (n == 0) {
 	   HALERR("component %s has no pins to watch for changes",
 		  name);
@@ -358,17 +231,13 @@ int hal_compile_comp(const char *name, hal_compiled_comp_t **ccomp)
        RTAPI_ZERO_BITMAP(tc->changed,tc->n_pins);
 
        // fill in pin array
-       n = 0;
-       next = hal_data->pin_list_ptr;
-       while (next != 0) {
-	   pin = SHMPTR(next);
-	   owner = halpr_find_owning_comp(pin->owner_id);
-	   if ((owner->comp_id == comp->comp_id) &&
-	       !(pin->flags & PIN_DO_NOT_TRACK))
-	       tc->pin[n++] = pin;
-	   next = pin->next_ptr;
-       }
-       assert(n == tc->n_pins);
+
+       // reuse args from above and pass tc
+       args.user_ptr1 = tc;
+       args.user_arg1 = 0; // pin index in cc
+       halg_foreach(0, &args, fill_pin_array);
+
+       assert(args.user_arg1 == tc->n_pins);
        tc->magic = CCOMP_MAGIC;
        *ccomp = tc;
    }
@@ -435,7 +304,7 @@ int hal_ccomp_match(hal_compiled_comp_t *cc)
 	    break;
 	default:
 	    HALERR("BUG: hal_ccomp_match(%s): invalid type for pin %s: %d",
-		   cc->comp->name, pin->name, pin->type);
+		   ho_name(cc->comp), ho_name(pin), pin->type);
 	    return -EINVAL;
 	}
     }

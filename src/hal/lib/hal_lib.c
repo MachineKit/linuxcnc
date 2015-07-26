@@ -166,7 +166,23 @@ void halpr_autorelease_mutex(void *variable)
 	rtapi_mutex_give(&(hal_data->mutex));
     else
 	// programming error
-	HALERR("BUG: halpr_autorelease_mutex called before hal_data inited");
+	HALBUG("called before hal_data inited, protector %p", variable);
+}
+
+// conditional version - makes locking a scope a runtime decision together with
+// WITH_HAL_MUTEX_IF(<integer>)
+void halpr_autorelease_mutex_if(void *variable)
+{
+    if (hal_data == NULL) { // programming error
+	HALBUG("called before hal_data inited, protector %p", variable);
+	return;
+    }
+    if (variable == NULL) {
+	HALBUG("halpr_autorelease_mutex_if called with NULL variable?");
+	return;
+    }
+    if (*((int *) variable))
+	rtapi_mutex_give(&(hal_data->mutex));
 }
 
 
@@ -175,9 +191,6 @@ void halpr_autorelease_mutex(void *variable)
 ************************************************************************/
 
 #ifdef RTAPI
-
-extern int hal_exit_threads(void); // in hal_thread.c
-
 
 /* these functions are called when the hal_lib RT module is insmod'ed
    or rmmod'ed, or the respective userland DSO is loaded and
@@ -205,7 +218,7 @@ void rtapi_app_exit(void)
 {
     HALDBG("removing RT hal_lib support");
     hal_proc_clean();
-    hal_exit_threads();
+    halg_exit_thread(1, NULL);
     hal_exit(lib_module_id);
     HALDBG("RT hal_lib support removed successfully");
 }
@@ -229,6 +242,7 @@ void rtapi_app_exit(void)
 static void  __attribute__ ((destructor))  ulapi_hal_lib_cleanup(void)
 {
     // exit the HAL library component (hal_lib%d % pid)
+    HALDBG("lib_module_id=%d", lib_module_id);
     if (lib_module_id > -1)
 	hal_exit(lib_module_id);
 
@@ -269,6 +283,28 @@ void hal_print_error(const char *fmt, ...)
     va_end(args);
 }
 
+void hal_print_loc(const int level,
+		   const char *func,
+		   const int line,
+		   const char *topic,
+		   const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    const char *pfmt = "%s:%d %s ";
+    rtapi_snprintf(_hal_errmsg, HALPRINTBUFFERLEN, pfmt,
+		   func  == NULL ? "(nil)" : func,
+		   line,
+		   topic == NULL ? "" : topic);
+    int n = strlen(_hal_errmsg);
+
+    vsnprintf(_hal_errmsg + n, HALPRINTBUFFERLEN - n, fmt, args);
+    rtapi_print_msg(level, _hal_errmsg);
+    va_end(args);
+}
+
+
 const char *hal_lasterror(void)
 {
     return _hal_errmsg;
@@ -280,18 +316,19 @@ const char *hal_lasterror(void)
 // ------------ public API:  ------------
 // hal_comp.c:
 EXPORT_SYMBOL(hal_init);
-EXPORT_SYMBOL(hal_xinit);
+EXPORT_SYMBOL(halg_xinit);
 EXPORT_SYMBOL(hal_xinitf);
-EXPORT_SYMBOL(hal_ready);
-EXPORT_SYMBOL(hal_exit);
+EXPORT_SYMBOL(halg_ready);
+EXPORT_SYMBOL(halg_exit);
 EXPORT_SYMBOL(hal_comp_name);
 
 // hal_memory.c:
-EXPORT_SYMBOL(hal_malloc);
+EXPORT_SYMBOL(halg_malloc);
 
 // hal_pin.c:
-EXPORT_SYMBOL(hal_pin_new);
+EXPORT_SYMBOL(halg_pin_new);
 EXPORT_SYMBOL(hal_pin_newf);
+EXPORT_SYMBOL(halg_pin_newf);
 
 EXPORT_SYMBOL(hal_pin_bit_new);
 EXPORT_SYMBOL(hal_pin_float_new);
@@ -303,10 +340,12 @@ EXPORT_SYMBOL(hal_pin_float_newf);
 EXPORT_SYMBOL(hal_pin_u32_newf);
 EXPORT_SYMBOL(hal_pin_s32_newf);
 
-EXPORT_SYMBOL(hal_signal_new);
-EXPORT_SYMBOL(hal_signal_delete);
-EXPORT_SYMBOL(hal_link);
-EXPORT_SYMBOL(hal_unlink);
+// hal_signal.c:
+EXPORT_SYMBOL(halg_signal_new);
+EXPORT_SYMBOL(halg_signal_delete);
+EXPORT_SYMBOL(halg_link);
+EXPORT_SYMBOL(halg_unlink);
+EXPORT_SYMBOL(halg_foreach_pin_by_signal);
 
 // hal_param.c:
 EXPORT_SYMBOL(hal_param_new);
@@ -343,35 +382,37 @@ EXPORT_SYMBOL(hal_start_threads);
 EXPORT_SYMBOL(hal_stop_threads);
 
 // hal_inst.c:
-EXPORT_SYMBOL(hal_inst_create);
-EXPORT_SYMBOL(hal_inst_delete);
+EXPORT_SYMBOL(halg_inst_create);
+EXPORT_SYMBOL(halg_inst_delete);
 
 // hal_lib.c:
 EXPORT_SYMBOL(hal_print_msg);
 EXPORT_SYMBOL(hal_print_error);
+EXPORT_SYMBOL(hal_print_loc);
 EXPORT_SYMBOL(hal_lasterror);
 EXPORT_SYMBOL(hal_shmem_base);
 
 // ------------ private API:  ------------
 //  found in their respective source files:
-EXPORT_SYMBOL(halpr_find_comp_by_name);
-EXPORT_SYMBOL(halpr_find_pin_by_name);
-EXPORT_SYMBOL(halpr_find_sig_by_name);
-EXPORT_SYMBOL(halpr_find_param_by_name);
-EXPORT_SYMBOL(halpr_find_thread_by_name);
-EXPORT_SYMBOL(halpr_find_funct_by_name);
-EXPORT_SYMBOL(halpr_find_inst_by_name);
+/* EXPORT_SYMBOL(halpr_find_comp_by_name); */
+/* EXPORT_SYMBOL(halpr_find_pin_by_name); */
+/* EXPORT_SYMBOL(halpr_find_sig_by_name); */
+/* EXPORT_SYMBOL(halpr_find_param_by_name); */
+/* EXPORT_SYMBOL(halpr_find_thread_by_name); */
+/* EXPORT_SYMBOL(halpr_find_funct_by_name); */
+/* EXPORT_SYMBOL(halpr_find_inst_by_name); */
 
+// hal_comp.c:
 EXPORT_SYMBOL(halpr_find_owning_comp);
 
-EXPORT_SYMBOL(halpr_find_pin_by_instance_id);
-EXPORT_SYMBOL(halpr_find_param_by_instance_id);
-EXPORT_SYMBOL(halpr_find_funct_by_instance_id);
-EXPORT_SYMBOL(halpr_find_inst_by_owning_comp);
 
-EXPORT_SYMBOL(halpr_find_inst_by_id);
-EXPORT_SYMBOL(halpr_find_comp_by_id);
+// hal_object.c:
+EXPORT_SYMBOL(halg_find_object_by_name);
+EXPORT_SYMBOL(halg_find_object_by_id);
+EXPORT_SYMBOL(halg_foreach);
 
-EXPORT_SYMBOL(halpr_find_pin_by_sig);
+//EXPORT_SYMBOL();
+//EXPORT_SYMBOL();
+
 
 #endif /* rtapi */

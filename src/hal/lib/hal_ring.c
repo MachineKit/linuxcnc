@@ -6,8 +6,6 @@
 #include "hal_internal.h"
 #include "hal_ring.h"		/* HAL ringbuffer decls */
 
-static hal_ring_t *alloc_ring_struct(void);
-static void free_ring_struct(hal_ring_t * p);
 static int next_ring_id(void);
 static int hal_ring_newfv(int size, int sp_size, int flags,
 			  const char *fmt, va_list ap);
@@ -29,10 +27,14 @@ int hal_ring_newf(int size, int sp_size, int mode, const char *fmt, ...)
     return ret;
 }
 
-int hal_ring_new(const char *name, int size, int sp_size, int mode)
+int halg_ring_new(const int use_hal_mutex,
+		  const char *name,
+		  int size,
+		  int sp_size,
+		  int mode)
 {
     hal_ring_t *rbdesc;
-    int *prev, next, cmp, retval;
+    int retval;
     int ring_id;
     ringheader_t *rhptr;
 
@@ -41,27 +43,28 @@ int hal_ring_new(const char *name, int size, int sp_size, int mode)
     CHECK_LOCK(HAL_LOCK_LOAD);
 
     {
-	hal_ring_t *ptr __attribute__((cleanup(halpr_autorelease_mutex)));
-
-	rtapi_mutex_get(&(hal_data->mutex));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
+	hal_ring_t *ptr;
 
 	// make sure no such ring name already exists
 	if ((ptr = halpr_find_ring_by_name(name)) != 0) {
 	    HALERR("ring '%s' already exists", name);
 	    return -EEXIST;
 	}
+
+	// allocate ring descriptor
+	if ((rbdesc = halg_create_object(0, sizeof(hal_ring_t),
+				       HAL_RING, 0, name)) == NULL)
+	    return -ENOMEM;
+
 	// allocate a new ring id - needed since we dont track ring shm
 	// segments in RTAPI
 	if ((ring_id = next_ring_id()) < 0) {
 	    HALERR("cant allocate new ring id for '%s'", name);
+	    shmfree_desc(rbdesc);
 	    return -ENOMEM;
 	}
 
-	// allocate a new ring descriptor
-	if ((rbdesc = alloc_ring_struct()) == 0)
-	    NOMEM("ring '%s'", name);
-
-	rbdesc->handle = rtapi_next_handle();
 	rbdesc->flags = mode;
 	rbdesc->ring_id = ring_id;
 
@@ -69,7 +72,7 @@ int hal_ring_new(const char *name, int size, int sp_size, int mode)
 	rbdesc->total_size = ring_memsize( rbdesc->flags, size, sp_size);
 
 	if (rbdesc->flags & ALLOC_HALMEM) {
-	    void *ringmem = shmalloc_up(rbdesc->total_size);
+	    void *ringmem = shmalloc_desc(rbdesc->total_size);
 	    if (ringmem == NULL)
 		NOMEM("ring '%s' size %d - insufficient HAL memory for ring",
 		      name,rbdesc->total_size);
@@ -102,33 +105,12 @@ int hal_ring_new(const char *name, int size, int sp_size, int mode)
 
 	ringheader_init(rhptr, rbdesc->flags, size, sp_size);
 	rhptr->refcount = 0; // on hal_ring_attach: increase; on hal_ring_detach: decrease
-	rtapi_snprintf(rbdesc->name, sizeof(rbdesc->name), "%s", name);
-	rbdesc->next_ptr = 0;
 
-	// search list for 'name' and insert new structure
-	prev = &(hal_data->ring_list_ptr);
-	next = *prev;
-	while (1) {
-	    if (next == 0) {
-		/* reached end of list, insert here */
-		rbdesc->next_ptr = next;
-		*prev = SHMOFF(rbdesc);
-		return 0;
-	    }
-	    ptr = SHMPTR(next);
-	    cmp = strcmp(ptr->name, rbdesc->name);
-	    if (cmp > 0) {
-		/* found the right place for it, insert here */
-		rbdesc->next_ptr = next;
-		*prev = SHMOFF(rbdesc);
-		return 0;
-	    }
-	    /* didn't find it yet, look at next one */
-	    prev = &(ptr->next_ptr);
-	    next = *prev;
-	}
-	// automatic unlock by scope exit
-    }
+	// make it visible
+	halg_add_object(false, (hal_object_ptr)rbdesc);
+
+    } // automatic unlock by scope exit
+    return 0;
 }
 
 int hal_ring_deletef(const char *fmt, ...)
@@ -141,87 +123,74 @@ int hal_ring_deletef(const char *fmt, ...)
     return ret;
 }
 
-int hal_ring_delete(const char *name)
+int free_ring_struct(hal_ring_t *hrptr)
 {
+    ringheader_t *rhptr;
+    int shmid = -1;
     int retval;
+
+    if (hrptr->flags & ALLOC_HALMEM) {
+	// ring exists as HAL memory.
+	rhptr = SHMPTR(hrptr->ring_offset);
+    } else {
+	// ring exists as shm segment. Retrieve shared memory address.
+	if ((shmid = rtapi_shmem_new_inst(hrptr->ring_shmkey,
+					  rtapi_instance, lib_module_id,
+					  0 )) < 0) {
+	    if (shmid != -EEXIST)  {
+		HALERR("ring '%s': rtapi_shmem_new_inst() failed %d",
+		       ho_name(hrptr), shmid);
+		return shmid;
+	    }
+	}
+	if ((retval = rtapi_shmem_getptr(shmid, (void **)&rhptr, 0))) {
+	    HALERR("ring '%s': rtapi_shmem_getptr %d failed %d",
+		   ho_name(hrptr), shmid, retval);
+	    return -ENOMEM;
+	}
+    }
+    // assure attach/detach balance is zero:
+    if (rhptr->refcount) {
+	HALERR("ring '%s' still attached - refcount=%d",
+	       ho_name(hrptr), rhptr->refcount);
+	return -EBUSY;
+    }
+
+    HALDBG("deleting ring '%s'", ho_name(hrptr));
+    if (hrptr->flags & ALLOC_HALMEM) {
+	shmfree_desc(rhptr);
+    } else {
+	if ((retval = rtapi_shmem_delete(shmid, lib_module_id)) < 0)  {
+	    HALERR("ring '%s': rtapi_shmem_delete(%d,%d) failed: %d",
+		   ho_name(hrptr), shmid, lib_module_id, retval);
+	    return retval;
+	}
+    }
+    // free descriptor. May return -EBUSY if ring referenced.
+    return halg_free_object(false, (hal_object_ptr)hrptr);
+}
+
+
+int halg_ring_delete(const int use_hal_mutex,
+		    const char *name)
+{
 
     CHECK_HALDATA();
     CHECK_STRLEN(name, HAL_NAME_LEN);
     CHECK_LOCK(HAL_LOCK_LOAD);
 
     {
-	hal_ring_t *hrptr __attribute__((cleanup(halpr_autorelease_mutex)));
-	rtapi_mutex_get(&(hal_data->mutex));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
+	hal_ring_t *hrptr;
 
 	// ring must exist
 	if ((hrptr = halpr_find_ring_by_name(name)) == NULL) {
 	    HALERR("ring '%s' not found", name);
 	    return -ENOENT;
 	}
-
-	ringheader_t *rhptr;
-	int shmid = -1;
-
-	if (hrptr->flags & ALLOC_HALMEM) {
-	    // ring exists as HAL memory.
-	    rhptr = SHMPTR(hrptr->ring_offset);
-	} else {
-	    // ring exists as shm segment. Retrieve shared memory address.
-	    if ((shmid = rtapi_shmem_new_inst(hrptr->ring_shmkey,
-					      rtapi_instance, lib_module_id,
-					      0 )) < 0) {
-		if (shmid != -EEXIST)  {
-		    HALERR("ring '%s': rtapi_shmem_new_inst() failed %d",
-			   name, shmid);
-		    return shmid;
-		}
-	    }
-	    if ((retval = rtapi_shmem_getptr(shmid, (void **)&rhptr, 0))) {
-		HALERR("ring '%s': rtapi_shmem_getptr %d failed %d",
-		       name, shmid, retval);
-		return -ENOMEM;
-	    }
-	}
-	// assure attach/detach balance is zero:
-	if (rhptr->refcount) {
-	    HALERR("ring '%s' still attached - refcount=%d",
-		   name, rhptr->refcount);
-	    return -EBUSY;
-	}
-
-	HALDBG("deleting ring '%s'", name);
-	if (hrptr->flags & ALLOC_HALMEM) {
-	    ; // if there were a HAL memory free function, call it here
-	} else {
-	    if ((retval = rtapi_shmem_delete(shmid, lib_module_id)) < 0)  {
-		HALERR("ring '%s': rtapi_shmem_delete(%d,%d) failed: %d",
-		       name, shmid, lib_module_id, retval);
-		return retval;
-	    }
-	}
-	// search for the ring (again..)
-	int *prev = &(hal_data->ring_list_ptr);
-	int next = *prev;
-	while (next != 0) {
-	    hrptr = SHMPTR(next);
-	    if (strcmp(hrptr->name, name) == 0) {
-		// this is the right ring
-		// unlink from list
-		*prev = hrptr->next_ptr;
-		// and delete it, linking it on the free list
-		free_ring_struct(hrptr);
-		return 0;
-	    }
-	    // no match, try the next one
-	    prev = &(hrptr->next_ptr);
-	    next = *prev;
-	}
-
-	HALERR("BUG: deleting ring '%s'; not found in ring_list?",
-	       name);
-	return -ENOENT;
+	free_ring_struct(hrptr);
     }
-
+    return 0;
 }
 
 int hal_ring_attachf(ringbuffer_t *rb, unsigned *flags, const char *fmt, ...)
@@ -234,7 +203,10 @@ int hal_ring_attachf(ringbuffer_t *rb, unsigned *flags, const char *fmt, ...)
     return ret;
 }
 
-int hal_ring_attach(const char *name, ringbuffer_t *rbptr,unsigned *flags)
+int halg_ring_attach(const int use_hal_mutex,
+		    const char *name,
+		    ringbuffer_t *rbptr,
+		    unsigned *flags)
 {
     hal_ring_t *rbdesc;
     ringheader_t *rhptr;
@@ -244,8 +216,8 @@ int hal_ring_attach(const char *name, ringbuffer_t *rbptr,unsigned *flags)
 
     // no mutex(es) held up to here
     {
-	int retval  __attribute__((cleanup(halpr_autorelease_mutex)));
-	rtapi_mutex_get(&(hal_data->mutex));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
+	int retval;
 
 	if ((rbdesc = halpr_find_ring_by_name(name)) == NULL) {
 	    HALERR("no such ring '%s'", name);
@@ -310,7 +282,9 @@ int hal_ring_detachf(ringbuffer_t *rb, const char *fmt, ...)
     return ret;
 }
 
-int hal_ring_detach(const char *name, ringbuffer_t *rbptr)
+int halg_ring_detach(const int use_hal_mutex,
+		     const char *name,
+		     ringbuffer_t *rbptr)
 {
 
     CHECK_HALDATA();
@@ -324,36 +298,12 @@ int hal_ring_detach(const char *name, ringbuffer_t *rbptr)
 
     // no mutex(es) held up to here
     {
-	int retval __attribute__((cleanup(halpr_autorelease_mutex)));
-	rtapi_mutex_get(&(hal_data->mutex));
+	WITH_HAL_MUTEX_IF(use_hal_mutex);
 
 	ringheader_t *rhptr = rbptr->header;
 	rhptr->refcount--;
 	rbptr->magic = 0;  // invalidate FIXME
-
-	// unlocking happens automatically on scope exit
     }
-    return 0;
-}
-
-//NB: not HAL lock
-hal_ring_t *halpr_find_ring_by_name(const char *name)
-{
-    int next;
-    hal_ring_t *ring;
-
-    /* search ring list for 'name' */
-    next = hal_data->ring_list_ptr;
-    while (next != 0) {
-	ring = SHMPTR(next);
-	if (strcmp(ring->name, name) == 0) {
-	    /* found a match */
-	    return ring;
-	}
-	/* didn't find it yet, look at next one */
-	next = ring->next_ptr;
-    }
-    /* if loop terminates, we reached end of list with no match */
     return 0;
 }
 
@@ -379,31 +329,6 @@ static int next_ring_id(void)
     return -EBUSY; // no more slots available
 }
 
-static hal_ring_t *alloc_ring_struct(void)
-{
-    hal_ring_t *p;
-
-    /* check the free list */
-    if (hal_data->ring_free_ptr != 0) {
-	/* found a free structure, point to it */
-	p = SHMPTR(hal_data->ring_free_ptr);
-	/* unlink it from the free list */
-	hal_data->ring_free_ptr = p->next_ptr;
-	p->next_ptr = 0;
-    } else {
-	/* nothing on free list, allocate a brand new one */
-	p = shmalloc_dn(sizeof(hal_ring_t));
-    }
-    return p;
-}
-
-static void free_ring_struct(hal_ring_t * p)
-{
-    /* add it to free list */
-    p->next_ptr = hal_data->ring_free_ptr;
-    hal_data->ring_free_ptr = SHMOFF(p);
-}
-
 // varargs helpers
 static int hal_ring_newfv(int size, int sp_size, int flags,
 			  const char *fmt, va_list ap)
@@ -416,7 +341,7 @@ static int hal_ring_newfv(int size, int sp_size, int flags,
 	       sz, name);
         return -ENOMEM;
     }
-    return hal_ring_new(name, size, sp_size, flags);
+    return halg_ring_new(1, name, size, sp_size, flags);
 }
 
 
@@ -430,7 +355,7 @@ static int hal_ring_deletefv(const char *fmt, va_list ap)
 	       sz, name);
         return -ENOMEM;
     }
-    return hal_ring_delete(name);
+    return halg_ring_delete(1, name);
 }
 
 static int hal_ring_attachfv(ringbuffer_t *rb, unsigned *flags,
@@ -444,7 +369,7 @@ static int hal_ring_attachfv(ringbuffer_t *rb, unsigned *flags,
 	       sz, name);
         return -ENOMEM;
     }
-    return hal_ring_attach(name, rb, flags);
+    return halg_ring_attach(1, name, rb, flags);
 }
 
 static int hal_ring_detachfv(ringbuffer_t *rb, const char *fmt, va_list ap)
@@ -457,18 +382,18 @@ static int hal_ring_detachfv(ringbuffer_t *rb, const char *fmt, va_list ap)
 	       sz, name);
         return -ENOMEM;
     }
-    return hal_ring_detach(name, rb);
+    return halg_ring_detach(1,name, rb);
 }
 
 #ifdef RTAPI
 
-EXPORT_SYMBOL(hal_ring_new);
+EXPORT_SYMBOL(halg_ring_new);
 EXPORT_SYMBOL(hal_ring_newf);
-EXPORT_SYMBOL(hal_ring_delete);
+EXPORT_SYMBOL(halg_ring_delete);
 EXPORT_SYMBOL(hal_ring_deletef);
-EXPORT_SYMBOL(hal_ring_attach);
+EXPORT_SYMBOL(halg_ring_attach);
 EXPORT_SYMBOL(hal_ring_attachf);
-EXPORT_SYMBOL(hal_ring_detach);
+EXPORT_SYMBOL(halg_ring_detach);
 EXPORT_SYMBOL(hal_ring_detachf);
 
 #endif
