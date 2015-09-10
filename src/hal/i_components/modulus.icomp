@@ -3,6 +3,7 @@ component modulus "Modulus of float division";
 pin in float divisor "Divisor to be divided by dividend";
 pin in float dividend = 1.0 "Dividend";
 pin out float out "Modulus output";
+
 function _;
 license "GPL";
 ;;
