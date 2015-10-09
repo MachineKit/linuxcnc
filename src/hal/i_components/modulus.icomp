@@ -1,0 +1,25 @@
+component modulus "Modulus of float division";
+
+pin in float divisor "Divisor to be divided by dividend";
+pin in float dividend = 1.0 "Dividend";
+pin out float out "Modulus output";
+
+function _;
+license "GPL";
+;;
+#include <rtapi_math.h>
+
+#define _INFINITY (1.0 / 0.0) 
+
+FUNCTION(_) {
+    if (dividend == 0) {
+        out = _INFINITY;
+        return 0;
+    }
+    hal_float_t tmp;
+    tmp = divisor / dividend;
+    if (tmp < 0) out = divisor + rtapi_floor(1 - tmp) * dividend;
+    else out = divisor - rtapi_floor(tmp) * dividend;
+    
+    return 0;
+}
