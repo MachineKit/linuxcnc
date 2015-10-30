@@ -9,14 +9,18 @@ cdef class Component:
     cdef dict _itemdict
     cdef int _handle
 
-    def __cinit__(self, name, mode=TYPE_USER, userarg1=0, int userarg2=0, wrap=False):
+    def __cinit__(self, name, mode=TYPE_USER, userarg1=0, int userarg2=0,
+                  wrap=False, noexit=False):
         global _comps
         self._itemdict = dict()
         if not wrap:
+            if name in components:
+                raise RuntimeError("component with name '%s' already exists" % name)
             id = hal_xinit(mode, userarg1, userarg2, NULL, NULL, name)
             if id < 0:
                 raise RuntimeError("Failed to create component '%s': %d - %s" % (name,id, hal_lasterror()))
-            _comps.append(id)  # to exit list
+            if not noexit:
+                _comps.append(id)  # to exit list
 
         self._cc = NULL
 
@@ -46,22 +50,27 @@ cdef class Component:
             raise KeyError("component %s: nonexistent pin %s" % (self._comp.name, name))
 
     def pins(self):
-        ''' return names of all pins owned by this component, which includes all instance pins'''
+        ''' return list of Pin objects owned by this component, which includes all instance pins'''
         cdef hal_pin_t *p
-        cdef list names
-        names = []
         p = NULL
 
+        pinnames = []
         with HALMutex():
             p = halpr_find_pin_by_owner_id(self._comp.comp_id, p)
             while p != NULL:
-                names.append(p.name)
+                pinnames.append(p.name)
                 p = halpr_find_pin_by_owner_id(self._comp.comp_id, p)
 
-        return names
+        pinlist = []
+        for n in pinnames:
+            pinlist.append(pins[n])
+        return pinlist
 
-
-
+    def pin(self, name, base=None):
+        ''' return component Pin object, base does not need to be supplied if pin name matches component name '''
+        if base == None:
+            base = self.name
+        return Pin('%s.%s' % (base, name))
 
     def exit(self):
         if self._cc != NULL:

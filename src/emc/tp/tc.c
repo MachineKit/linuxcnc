@@ -434,10 +434,10 @@ int tcFindBlendTolerance(TC_STRUCT const * const prev_tc,
     if (T2 == 0) {
         T2 = tc->nominal_length * tolerance_ratio;
     }
-    *nominal_tolerance = fmin(T1,T2);
+    *nominal_tolerance = rtapi_fmin(T1,T2);
     //Blend tolerance is the limit of what we can reach by blending alone,
     //consuming half a segment or less (parabolic equivalent)
-    double blend_tolerance = fmin(fmin(*nominal_tolerance, 
+    double blend_tolerance = rtapi_fmin(rtapi_fmin(*nominal_tolerance, 
                 prev_tc->nominal_length * tolerance_ratio),
             tc->nominal_length * tolerance_ratio);
     *T_blend = blend_tolerance;
@@ -552,6 +552,8 @@ int tcSetupMotion(TC_STRUCT * const tc,
     tc->reqvel = vel;
     // Initial guess at target velocity is just the requested velocity
     tc->target_vel = vel;
+    // To be filled in by tangent calculation, negative = invalid (KLUDGE)
+    tc->kink_vel = -1.0;
 
     return TP_ERR_OK;
 }
@@ -642,7 +644,6 @@ int tcFinalizeLength(TC_STRUCT * const tc)
 {
     //Apply velocity corrections
     if (!tc) {
-        tp_debug_print("Missing prev_tc in finalize!\n");
         return TP_ERR_FAIL;
     }
 
@@ -659,7 +660,26 @@ int tcFinalizeLength(TC_STRUCT * const tc)
     if (tc->motion_type == TC_CIRCULAR) {
         tc->maxvel = pmCircleActualMaxVel(&tc->coords.circle.xyz, tc->maxvel, tc->maxaccel, parabolic);
     }
+
+    tcClampVelocityByLength(tc);
+
     tc->finalized = 1;
+    return TP_ERR_OK;
+}
+
+
+int tcClampVelocityByLength(TC_STRUCT * const tc)
+{
+    //Apply velocity corrections
+    if (!tc) {
+        return TP_ERR_FAIL;
+    }
+
+    //Reduce max velocity to match sample rate
+    //Assume that cycle time is valid here
+    double sample_maxvel = tc->target / tc->cycle_time;
+    tp_debug_print("sample_maxvel = %f\n",sample_maxvel);
+    tc->maxvel = rtapi_fmin(tc->maxvel, sample_maxvel);
     return TP_ERR_OK;
 }
 

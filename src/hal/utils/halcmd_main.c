@@ -156,8 +156,6 @@ int main(int argc, char **argv)
 	    case 'P':
                 proto_debug = 1;
 		break;
-
-
 	    case 'C':
                 cl = getenv("COMP_LINE");
                 cw = getenv("COMP_POINT");

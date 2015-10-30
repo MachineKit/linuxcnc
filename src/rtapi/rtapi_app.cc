@@ -83,7 +83,6 @@ using namespace google::protobuf;
 #include "mk-backtrace.h"
 #include "setup_signals.h"
 #include "mk-zeroconf.hh"
-#include "select_interface.h"
 
 #define BACKGROUND_TIMER 1000
 
@@ -353,12 +352,6 @@ static const char **pbargv(const pbstringarray_t &args)
     return argv;
 }
 
-static inline bool kernel_threads(flavor_ptr f) {
-    assert(f);
-    return (f->flags & FLAVOR_KERNEL_BUILD) != 0;
-}
-
-
 static void usrfunct_error(const int retval,
 			   const string &func,
 			   pbstringarray_t args,
@@ -522,7 +515,7 @@ static int do_load_cmd(int instance,
 
     if (w == NULL) {
 	if (kernel_threads(flavor)) {
-	    string cmdargs = pbconcat(args);
+	    string cmdargs = pbconcat(args, " ", "'");
 	    retval = run_module_helper("insert %s %s", name.c_str(), cmdargs.c_str());
 	    if (retval) {
 		note_printf(pbreply, "couldnt insmod %s - see dmesg\n", name.c_str());
@@ -871,13 +864,15 @@ static int rtapi_request(zloop_t *loop, zmq_pollitem_t *poller, void *arg)
 	assert(pbreq.rtapicmd().has_cpu());
 	assert(pbreq.rtapicmd().has_use_fp());
 	assert(pbreq.rtapicmd().has_instance());
+	assert(pbreq.rtapicmd().has_flags());
 
 	if (kernel_threads(flavor)) {
-	    int retval =  procfs_cmd(PROCFS_RTAPICMD,"newthread %s %d %d %d",
-					   pbreq.rtapicmd().threadname().c_str(),
-					   pbreq.rtapicmd().threadperiod(),
-					   pbreq.rtapicmd().use_fp(),
-					   pbreq.rtapicmd().cpu());
+	    int retval =  procfs_cmd(PROCFS_RTAPICMD,"newthread %s %d %d %d %d",
+				     pbreq.rtapicmd().threadname().c_str(),
+				     pbreq.rtapicmd().threadperiod(),
+				     pbreq.rtapicmd().use_fp(),
+				     pbreq.rtapicmd().cpu(),
+				     pbreq.rtapicmd().flags());
 	    pbreply.set_retcode(retval < 0 ? retval:0);
 
 	} else {
@@ -887,18 +882,24 @@ static int rtapi_request(zloop_t *loop, zmq_pollitem_t *poller, void *arg)
 		pbreply.set_retcode(-1);
 		break;
 	    }
-	    int (*create_thread)(const char *, unsigned long,int, int) =
-		DLSYM<int(*)(const char *, unsigned long,int, int)>(w,
-								    "hal_create_thread");
+	    int (*create_thread)(const hal_threadargs_t*) =
+		DLSYM<int(*)(const hal_threadargs_t*)>(w, "hal_create_xthread");
 	    if (create_thread == NULL) {
 		pbreply.add_note("symbol 'hal_create_thread' not found in hal_lib");
 		pbreply.set_retcode(-1);
 		break;
 	    }
-	    int retval = create_thread(pbreq.rtapicmd().threadname().c_str(),
-				       pbreq.rtapicmd().threadperiod(),
-				       pbreq.rtapicmd().use_fp(),
-				       pbreq.rtapicmd().cpu());
+	    hal_threadargs_t args;
+	    args.name = pbreq.rtapicmd().threadname().c_str();
+	    args.period_nsec = pbreq.rtapicmd().threadperiod();
+	    args.uses_fp = pbreq.rtapicmd().use_fp();
+	    args.cpu_id = pbreq.rtapicmd().cpu();
+	    args.flags = (rtapi_thread_flags_t) pbreq.rtapicmd().flags();
+
+	    int retval = create_thread(&args);
+	    if (retval < 0) {
+		pbreply.add_note("hal_create_xthread() failed, see log");
+	    }
 	    pbreply.set_retcode(retval);
 	}
 	break;

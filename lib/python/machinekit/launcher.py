@@ -7,6 +7,7 @@ from machinekit import compat
 
 _processes = []
 _realtimeStarted = False
+_exiting = False
 
 
 # ends a running Machinekit session
@@ -107,11 +108,22 @@ def stop_processes():
 def load_hal_file(filename, ini=None):
     sys.stdout.write("loading " + filename + '... ')
     sys.stdout.flush()
-    command = 'halcmd'
-    if ini is not None:
-        command += ' -i ' + ini
-    command += ' -f ' + filename
-    subprocess.check_call(command, shell=True)
+
+    _, ext = os.path.splitext(filename)
+    if ext == '.py':
+        from machinekit import rtapi
+        if not rtapi.__rtapicmd:
+            rtapi.init_RTAPI()
+        if ini is not None:
+            from machinekit import config
+            config.load_ini(ini)
+        execfile(filename)
+    else:
+        command = 'halcmd'
+        if ini is not None:
+            command += ' -i ' + ini
+        command += ' -f ' + filename
+        subprocess.check_call(command, shell=True)
     sys.stdout.write('done\n')
 
 
@@ -127,7 +139,7 @@ def load_bbio_file(filename):
 # installs a comp RT component
 def install_comp(filename):
     install = True
-    base = os.path.splitext(os.path.basename(filename))[0]
+    base, ext = os.path.splitext(os.path.basename(filename))
     flavor = compat.default_flavor()
     moduleDir = compat.get_rtapi_config("RTLIB_DIR")
     moduleName = flavor.name + '/' + base + flavor.mod_ext
@@ -139,17 +151,25 @@ def install_comp(filename):
             install = False
 
     if install is True:
+        if ext == '.icomp':
+            cmdBase = 'instcomp'
+        else:
+            cmdBase = 'comp'
         sys.stdout.write("installing " + filename + '... ')
         sys.stdout.flush()
         if os.access(moduleDir, os.W_OK):  # if we have write access we might not need sudo
-            subprocess.check_call('comp --install ' + filename, shell=True)
+            cmd = '%s --install %s' % (cmdBase, filename)
         else:
-            subprocess.check_call('sudo comp --install ' + filename, shell=True)
+            cmd = 'sudo %s --install %s' % (cmdBase, filename)
+
+        subprocess.check_call(cmd, shell=True)
+
         sys.stdout.write('done\n')
 
 
 # starts realtime
 def start_realtime():
+    global _realtimeStarted
     sys.stdout.write("starting realtime...")
     sys.stdout.flush()
     subprocess.check_call('realtime start', shell=True)
@@ -159,6 +179,7 @@ def start_realtime():
 
 # stops realtime
 def stop_realtime():
+    global _realtimeStarted
     sys.stdout.write("stopping realtime... ")
     sys.stdout.flush()
     subprocess.check_call('realtime stop', shell=True)
@@ -225,8 +246,12 @@ def register_exit_handler():
 def _exitHandler(signum, frame):
     del signum  # unused
     del frame  # unused
-    end_session()
-    sys.exit(0)
+    global _exiting
+
+    if not _exiting:
+        _exiting = True  # prevent double execution
+        end_session()
+        sys.exit(0)
 
 
 # set the Machinekit debug level

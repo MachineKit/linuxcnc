@@ -499,7 +499,7 @@ typedef __u64 ireal_t __attribute__((aligned(8))); // integral type as wide as r
 typedef union {
     hal_bit_t b;
     hal_s32_t s;
-    hal_s32_t u;
+    hal_u32_t u;
     hal_float_t f;
 } hal_data_u;
 
@@ -1065,6 +1065,15 @@ int hal_inst_create(const char *name,
 // delf's and deletes functs expored by this instance
 // returns < 0 on error.
 int hal_inst_delete(const char *name);
+
+// HAL-specific capabilities. Extend as needed.
+// capabilities are intended to be added to a binary (a.out, .so, .ko)
+// with RTAPI_TAG(HAL, cap1]cap2 ...);
+
+#define HC_INSTANTIABLE 1
+#define HC_SINGLETON 2
+#define HC_SOMEFEATURE  3
+
 
 RTAPI_END_DECLS
 

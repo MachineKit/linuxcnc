@@ -17,15 +17,14 @@ Build-Depends: debhelper (>= 6),
     uuid-dev, uuid-runtime, libavahi-client-dev,
     libprotobuf-dev (>= 2.4.1), protobuf-compiler (>= 2.4.1),
     python-protobuf (>= 2.4.1), libprotoc-dev (>= 2.4.1),
-    python-netifaces, python-simplejson, libtk-img,
-    libboost-thread-dev, python-pyftpdlib, @BUILD_DEPS@ @TCL_TK_BUILD_DEPS@
+    python-simplejson, libtk-img, libboost-thread-dev,
+    python-pyftpdlib, @BUILD_DEPS@ @TCL_TK_BUILD_DEPS@
 Standards-Version: 2.1.0
 
 Package: machinekit-dev
 Architecture: any
 Depends: make, g++, @TCL_TK_BUILD_DEPS@,
-    python (>= 2.6), python (<< 2.8),
-    ${shlibs:Depends}, ${misc:Depends}, ${python:Depends},
+    ${shlibs:Depends}, ${misc:Depends},
     machinekit (= ${binary:Version}),
     yapps2-runtime
 Section: libs
@@ -43,14 +42,13 @@ Replaces: linuxcnc
 Architecture: any
 Depends: ${shlibs:Depends}, machinekit-rt-threads, @TCL_TK_DEPS@,
     bwidget (>= 1.7), libtk-img (>=1.13),
-    python (= ${python:Versions}),
     ${python:Depends}, ${misc:Depends},
     python-tk, python-imaging, python-imaging-tk,
     python-gnome2, python-glade2,
     python-numpy, python-gtksourceview2,
     python-vte, python-xlib, python-gtkglext1, python-configobj,
     python-zmq, python-protobuf (>= 2.4.1), python-gst0.10,
-    python-avahi, python-netifaces, python-simplejson, python-pyftpdlib,
+    python-avahi, python-simplejson, python-pyftpdlib,
     tclreadline, bc, procps, psmisc, module-init-tools | kmod
 Description: PC based motion controller for real-time Linux
  Machinekit is the next-generation Enhanced Machine Controller which

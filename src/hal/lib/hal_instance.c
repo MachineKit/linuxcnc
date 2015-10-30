@@ -16,10 +16,12 @@ int hal_inst_create(const char *name, const int comp_id, const int size,
     CHECK_STR(name);
 
     {
-	hal_inst_t *inst  __attribute__((cleanup(halpr_autorelease_mutex)));
+
+	WITH_HAL_MUTEX();
+
+	hal_inst_t *inst;
 	hal_comp_t *comp;
 	void *m = NULL;
-	rtapi_mutex_get(&(hal_data->mutex));
 
 	// comp must exist
 	if ((comp = halpr_find_comp_by_id(comp_id)) == 0) {
@@ -78,8 +80,9 @@ int hal_inst_delete(const char *name)
     CHECK_STR(name);
 
     {
-	hal_inst_t *inst  __attribute__((cleanup(halpr_autorelease_mutex)));
-	rtapi_mutex_get(&(hal_data->mutex));
+	WITH_HAL_MUTEX();
+
+	hal_inst_t *inst;
 
 	// inst must exist
 	if ((inst = halpr_find_inst_by_name(name)) == NULL) {
@@ -334,7 +337,12 @@ void free_inst_struct(hal_inst_t * inst)
 	//NB - pins, params etc still intact
 	// this instance is owned by this comp, call destructor
 	HALDBG("calling custom destructor(%s,%s)", comp->name, inst->name);
+
+	// for the time being (until the halg_ API is fully merged), unlock HAL
+	// while calling the dtor
+	rtapi_mutex_give(&(hal_data->mutex));
 	comp->dtor(inst->name, SHMPTR(inst->inst_data_ptr), inst->inst_size);
+	rtapi_mutex_get(&(hal_data->mutex));
     }
 #endif /* RTAPI */
 
