@@ -133,6 +133,7 @@ setup_struct::setup_struct() :
     lathe_diameter_mode(0),
     mdi_interrupt(0),
     feature_set(0),
+    enable_fanuc_style_sub(true),
     on_abort_command(NULL),
     init_once(1),
     m_remappable(),
@@ -155,4 +156,23 @@ setup_struct::setup_struct() :
     memset(tool_table, 0, sizeof(tool_table));
     ZERO_EMC_POSE(tool_offset);
 
+}
+
+
+context_struct::context_struct() :
+    position(0),
+    sequence_number(0),
+    filename(""),
+    subName(""),
+    m98_loop_counter(-1),
+    context_status(0),
+    call_type(0),
+    py_return_type(0),
+    py_returned_double(0),
+    py_returned_int(0)
+{
+    memset(saved_params, 0, sizeof(saved_params));
+    memset(saved_g_codes, 0, sizeof(saved_g_codes));
+    memset(saved_m_codes, 0, sizeof(saved_m_codes));
+    memset(saved_settings, 0, sizeof(saved_settings));
 }
