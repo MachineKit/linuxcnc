@@ -21,10 +21,11 @@ env:
   global:
     - ROOT=/opt/rootfs
     - JOBS=2
-  matrix:
-    - TAG=wheezy-64    CMD=run_tests
-    - TAG=wheezy-64    CMD=build_deb
+    - secure: "bJU5CEGpbd/dlyQ977fWLR+NucRGM0e94ypMADMTOYsEFiXaboS7JErsVfPGbxylBl6cOTw7wGNo8ttX1kE50f/IDZARHBG0qd06YKiNKb/eLxYUg+hhDMy//O0n5r+uOfWbSgpA1LswwMn7vXvYIsJcM63RoihNEab2xDkceTw5ij0yGYiOkHHbJaSSrqNdxcXfKot6djMbhoEnBn1SzeChgr6eX32Lw2kMOJmVMUzl7PifB4nPyEHyWh/02jJfHXZ/4sM6MdCNQuDA3vdMCcXnB6MEYv+dP5SPDIc09EkHF6CD2d1Y8PqSxHdflwCSzldGPmrzd/zyl6eLVImpLFjkKAwIpJ6BNgIuPv3y304eHj1BnJEF3vhM7vqKNKwRClFezHCG+4PrawtP2kCJtGMv9FR/yZbwYHSSUJFwGRSCmCV3HPz2O/4YApWaYbFB/B+Npt2/izijtm8qcSuJRyDiDvIMry4gCh/eaPxfYRoBxWevfhFnsx1lk05UZ+fzg4v9uFCBUnSPYtFk7UmlP7sWs8WpwSbLelbVEn31BOHf4zjJrKuu8Vb7VqPTqJyZz0xaapTI4l8qI/qpxmZoHAYCcIXWN17oXRxvuv9TNw93VS0awBVs01GcbgYJa4CNY2bquak/qQe6WijIlwCklp3viKWtmlTzcrZoFLCemoo="
+    - secure: "wT/ZOEbLArbaAaxudaDncBvLgpPn8O6oYvCBqX9MPZmYJGp6Vd6K4ccxlbMlEfg1F5VNTNSTGckuNzMr9v003/Qxszqo4+0HrO+c3nc1jdZFaWUO+qYBxcCPdcI7qIdZwMgyMaKxHOqNh8LLWxVvaM0vCCNerCLb6gr/Wi1rgV1CSjrYlvqAUZqHnDECbblL4oVXC5DcyWwCHtlZtBZvpAtZGwRVLT9OUrfzxJT6mG+G//fzWliN7709my+cYE3VX1jivBSYIaQmgmAhVi8tySWoF9Vk4aSo2BVxJ7y/u560spujqDu7MeeHMcmG+75wXOfiIfIUD8X6NN6pTYAdD2WHm6GS6UFDIGRuRdDqrld3e2/odxPVaNqxGF4ULtg7QQsshliIQg6RRm323Cng9zEPgjXvlPXqd1PxvLASx6yYIlhL4ahEHQwjn56QULot7D0IlXCKBPHsRt3aLQWqsLngcYkXLw7ATVpliMiMEoSza45s2QVH/rtP9rE8snPOhiRUZHJ60akOVgzVe8Nd3d2YbeNbRCYkydChGpPWsdpEE8dbT59CrxQ6yLp3etuKCLAT+YgmGXGDaKXPk7itYCwh6zV299NdYxSnREybfstoYkWW8p0TrIouYdfGSHHwUM7a5B/5UyBpshaXJ9QI/LkXGYdR7JwqG69XOnraq08="
 
 script:
-- .travis/docker_run.sh
+- echo ${TESTVAR1} || true
+- echo ${TESTVAR2} || true
+
 
