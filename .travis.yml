@@ -11,7 +11,6 @@ notifications:
     on_failure: always
     on_start: never
 
-
 language: bash
 
 services:
@@ -21,10 +20,8 @@ env:
   global:
     - ROOT=/opt/rootfs
     - JOBS=2
-  matrix:
-    - TAG=wheezy-64    CMD=run_tests
-    - TAG=wheezy-64    CMD=build_deb
+    - secure: "gHif40Zg1quAg5ABfkfhPfjCyNfWv25pGwiIwyeHfka1p1BnqDV4WggxyOwj+6vvFCmYofElmCqdDXF7x1iZ3knxTB7C9MmNzYitheVgzZR4MK1PL8cLBySIwqzyOU6ExR6xq6sfIXCThVDo+kqeGeXsfF1Wd/2SQR4nDwVrLkQ+8YdsHby5AaZxD1tnFsQ9hCXU21255GHPhB2/HCTSESjdSjAAQKnAvcNRhGGHfmL6qNkO6iIjoMraBhZpS3J5jU1jK7ShOCwti4YDcoDjlVc5R59vjvXzKb7364gJ5vGoPKG9JloSZiIQE2VMYZ5DYa0vWC87MEGbwxUl83zfIcjNLlAufRemcVYuZFbJCW90CqskeANP86ygX9Xz6/ZneWdac8kDpoqYEGHIzPYuzUO2TCZI0OSD5leh3s+yUciWnfJ2YWtC5FpLxX3SeuyMi1TwbQtDRXFQ0WMFRlbp7GGQFwYPtQ05/Ij8acizEhuDhcmA6gkTfjmkMsZQ3MbGOzN9FlSSsTH7RHS60NK0qEGxDHcyDHWPfcDYAlfh/4sJscdQ6W8coq9RuNhbou/2jGkaJbUwTU80lv+KC2m9uB8iNK5EjlLIm/N+xMAVHpw9M0MSK1AL0bTzYmltvlUA58XmvVdTFJL2anQfuVTn/bHw3zndVxotzgZKAlB/YIU="
 
 script:
-- .travis/docker_run.sh
+- echo ${TESTVAR1} || true
 
