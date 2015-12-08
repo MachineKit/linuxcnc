@@ -1,0 +1,33 @@
+.TH IDB "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+idb \- Inverse Deadband
+.SH SYNOPSIS
+.HP
+.B loadrt idb [count=\fIN\fB|names=\fIname1\fB[,\fIname2...\fB]]
+.SH FUNCTIONS
+.TP
+\fBidb.\fIN\fB\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B idb.\fIN\fB.in\fR float in \fR
+Input
+.TP
+.B idb.\fIN\fB.out\fR float out \fR
+Output
+.SH PARAMETERS
+.TP
+.B idb.\fIN\fB.amount\fR float rw \fR
+.SH AUTHOR
+
+Anders Wallin
+.SH LICENSE
+
+GPL

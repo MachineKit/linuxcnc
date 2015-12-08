@@ -1,0 +1,73 @@
+.TH PCL720 "9" "2014-11-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+pcl720 \- Driver for the Advantech PCL 720 card.
+.SH SYNOPSIS
+.HP
+.B loadrt pcl720 [ioaddr=\fIN\fB]
+.RS 4
+.TP
+\fBioaddr\fR
+Base address of card. Separate each card base address
+with a comma but no space to load more than one card. eg
+loadrt pcl720 ioaddr=0x200,0x200. use 0xNNN to define addresses in Hex
+.RE
+.SH DESCRIPTION
+
+This driver supports the Advantech PCL720 ISA card. It might
+work with the PCI version too, but this is untested. 
+ It creates hal pins corresonding to the digital inputs and outputs, but does
+not support the the counters/timers.
+.SH FUNCTIONS
+.TP
+\fBpcl720.\fIN\fB.read\fR
+Reads each of the digital inputs and updates the HAL pins
+.TP
+\fBpcl720.\fIN\fB.write\fR
+Writes the values of the output HAL pins to the digital IO
+.TP
+\fBpcl720.\fIN\fB.reset\fR
+Waits for the length of time specified by the
+\fBreset-time\fP parameter and resets any pins for which the \fBreset\fP
+parameter has been set. This can be used to allow step generators to make a step
+every thread rather than every other thread. This function must be added to the
+thread after the "write" function.
+ Do not use this function if you do not wish to reset any pins.
+ the stepgen \fBstep-space\fP parameter should be set to 0 to make use of this
+function.
+.SH PINS
+.TP
+.B pcl720.\fIN\fB.pin-\fIMM\fB-out\fR bit in  (MM=00..31) \fR
+Output pins
+.TP
+.B pcl720.\fIN\fB.pin-\fIMM\fB-in\fR bit out  (MM=00..31) \fR
+Input pins
+.TP
+.B pcl720.\fIN\fB.pin-\fIMM\fB-in-not\fR bit out  (MM=00..31) \fR
+Inverted version of each input pin
+.TP
+.B pcl720.\fIN\fB.wait-clocks\fR u32 out \fR
+.SH PARAMETERS
+.TP
+.B pcl720.\fIN\fB.reset-time\fR u32 rw \fR(default: \fI5000\fR)
+The time in nanoseconds after the write function
+has run to reset the pins for which the "reset" parameter is set.
+.TP
+.B pcl720.\fIN\fB.pin-\fIMM\fB-reset\fR bit rw  (MM=00..31) \fR
+specifies if the pin should be reset by the "reset"
+function
+.TP
+.B pcl720.\fIN\fB.pin-\fIMM\fB-out-invert\fR bit rw  (MM=00..31) \fR
+Set to true to invert the sense of the output pin
+.SH AUTHOR
+
+Andy Pugh
+.SH LICENSE
+
+GPL

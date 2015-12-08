@@ -1,0 +1,33 @@
+.TH RINGREAD "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+ringread
+.SH SYNOPSIS
+.HP
+.B loadrt ringread
+.SH FUNCTIONS
+.TP
+\fBringread\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B ringread.underrun\fR u32 out \fR
+number of failed read attempts
+.TP
+.B ringread.received\fR u32 out \fR
+number of successful read attempts
+.TP
+.B ringread.tooslow\fR u32 out \fR
+number of times the reader couldnt keep up with the writer
+.TP
+.B ringread.circular\fR bit in \fR
+circular flag - set to nonzero to enable circular record buffer
+.SH LICENSE
+
+GPLv2 or later

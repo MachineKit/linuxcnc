@@ -1,0 +1,35 @@
+.TH LIMIT2 "9" "2014-12-27" "LinuxCNC Documentation" "HAL Component"
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+
+.SH NAME
+
+limit2 \- Limit the output signal to fall between min and max and limit its slew rate to less than maxv per second.  When the signal is a position, this means that position and velocity are limited.
+.SH SYNOPSIS
+.HP
+.B loadrt limit2 [count=\fIN\fB|names=\fIname1\fB[,\fIname2...\fB]]
+.SH FUNCTIONS
+.TP
+\fBlimit2.\fIN\fB\fR (requires a floating-point thread)
+
+.SH PINS
+.TP
+.B limit2.\fIN\fB.in\fR float in \fR
+.TQ
+.B limit2.\fIN\fB.out\fR float out \fR
+.TQ
+.B limit2.\fIN\fB.load\fR bit in \fR
+When TRUE, immediately set \fBout\fB to \fBin\fR, ignoring maxv
+.SH PARAMETERS
+.TP
+.B limit2.\fIN\fB.min\fR float rw \fR(default: \fI-1e20\fR)
+.TQ
+.B limit2.\fIN\fB.max\fR float rw \fR(default: \fI1e20\fR)
+.TQ
+.B limit2.\fIN\fB.maxv\fR float rw \fR(default: \fI1e20\fR)
+.SH LICENSE
+
+GPL
