@@ -49,10 +49,20 @@
 
 #include "config.h"
 
-#if defined(USERMODE_PCI) && defined(BUILD_SYS_USER_DSO)
+// this should be an general socfpga #define
+#if !defined(TARGET_PLATFORM_SOCFPGA)
+#error "This driver is for the socfpga platform only"
+#endif
+
+#if !defined(BUILD_SYS_USER_DSO)
+#error "This driver is for usermode threads only"
+#endif
+
+
+//#if defined(USERMODE_PCI) && defined(BUILD_SYS_USER_DSO)
 #include <sys/io.h>
 #include <rtapi.h>
-#include <rtapi/rtapi_pci.h>
+//#include <rtapi/rtapi_pci.h>
 #else
 #include <linux/pci.h>
 #endif
@@ -64,15 +74,15 @@
 
 #include "hal.h"
 
-#include "bitfile.h"
+//#include "bitfile.h"
 #include "hostmot2-lowlevel.h"
 #include "hm2_cvsoc.h"
 
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Michael Brown");
-MODULE_DESCRIPTION("Driver for HostMot2 on the DE0 Nano / Atlas Cyclone V socfpga board from Terasic");
-MODULE_SUPPORTED_DEVICE("Mesa-AnythingIO-5i20");  // FIXME
+MODULE_DESCRIPTION("Driver initially for HostMot2 on the DE0 Nano / Atlas Cyclone V socfpga board from Terasic");
+MODULE_SUPPORTED_DEVICE("Mesa-AnythingIO-5i25");  // FIXME
 
 
 static char *config[HM2_SOC_MAX_BOARDS];
@@ -123,14 +133,12 @@ static struct dts_device_id hm2_cvsoc_tbl[] = {
         .vendor =  HM2_PCI_VENDORID_MESA,
         .device = HM2_PCI_DEV_MESA5I25,
         .subvendor = HM2_PCI_VENDORID_MESA,
-        .subdevice = HM2_PCI_SSDEV_5I25,
+        .subdevice = hm2reg-io,
     },
 */    {0,},
 };
 
 MODULE_DEVICE_TABLE(soc, hm2_cvsoc_tbl);
-
-
 
 
 // 
@@ -386,31 +394,32 @@ static int hm2_cvsoc_probe(struct pci_dev *dev, const struct dts_device_id *id) 
 
 
     if (num_boards >= HM2_SOC_MAX_BOARDS) {
-        LL_PRINT("skipping AnyIO board at %s, this driver can only handle %d\n", pci_name(dev), HM2_SOC_MAX_BOARDS);
+        LL_PRINT("skipping hm2 soc interface at %s, this driver can only handle %d\n", dts_name(dev), HM2_SOC_MAX_BOARDS);
         return -EINVAL;
     }
-
+/*
 // NOTE: this enables the board's BARs -- this fixes the Arty bug
     if (cvsoc_enable_device(dev)) {
-        LL_PRINT("skipping AnyIO board at %s, failed to enable PCI device\n", pci_name(dev));
+        LL_PRINT("skipping hm2 soc interface  at %s, failed to enable UIO device\n", dts_name(dev));
         return failed_errno = -ENODEV;
     }
-
+*/ // Dont think this is needed.
 
     board = &hm2_cvsoc_board[num_boards];
     this = &board->llio;
     memset(this, 0, sizeof(hm2_lowlevel_io_t));
 
-    switch (dev->subsystem_device) {
-
-        case HM2_PCI_SSDEV_5I25:
+//    switch (dev->name) {
+    switch (dev->name) {
+            
+        case hm2reg-io:
         case HM2_PCI_SSDEV_6I25: {
-            if (dev->subsystem_device == HM2_PCI_SSDEV_5I25) {
-                LL_PRINT("discovered 5i25 at %s\n", pci_name(dev));
+            if (dev->name == hm2reg-io) {
+                LL_PRINT("discovered 5i25 at %s\n", dts_name(dev));
                 rtapi_snprintf(board->llio.name, sizeof(board->llio.name), "hm2_5i25.%d", num_5i25);
                 num_5i25 ++;
             } else {
-                LL_PRINT("discovered 6i25 at %s\n", pci_name(dev));
+                LL_PRINT("discovered 6i25 at %s\n", dts_name(dev));
                 rtapi_snprintf(board->llio.name, sizeof(board->llio.name), "hm2_6i25.%d", num_6i25);
                 num_6i25 ++;
             }
@@ -424,17 +433,17 @@ static int hm2_cvsoc_probe(struct pci_dev *dev, const struct dts_device_id *id) 
         }
 
         default: {
-            LL_ERR("unknown subsystem device id 0x%04x\n", dev->subsystem_device);
+            LL_ERR("unknown subsystem device id 0x%04x\n", dev->name);
             return failed_errno = -ENODEV;
         }
     }
 
 
-    switch (dev->device) {
+    switch (dev->group) {
         case HM2_PCI_DEV_MESA5I25:
         case HM2_PCI_DEV_MESA6I25: {
-              // BAR 0 is 64K mem (32 bit)
-            board->len = pci_resource_len(dev, 0);
+              // mksocfpga_io_hm2 is 64K mem (32 bit)
+//            board->len = pci_resource_len(dev, 0);
             board->base = pci_ioremap_bar(dev, 0);
             if (board->base == NULL) {
                 THIS_ERR("could not map in FPGA address space\n");
@@ -445,7 +454,7 @@ static int hm2_cvsoc_probe(struct pci_dev *dev, const struct dts_device_id *id) 
         }
 
         default: {
-            THIS_ERR("unknown PCI Device ID 0x%04x\n", dev->device);
+            THIS_ERR("unknown DTS Device ID 0x%04x\n", dev->group);
             r = -ENODEV;
             goto fail0;
         }
@@ -471,7 +480,7 @@ static int hm2_cvsoc_probe(struct pci_dev *dev, const struct dts_device_id *id) 
         goto fail1;
     }
 
-//    THIS_PRINT("initialized AnyIO board at %s\n", pci_name(dev));
+//    THIS_PRINT("initialized AnyIO board at %s\n", dts_name(dev));
     THIS_PRINT("initialized AnyIO board at %s\n", cvsoc_name(dev));
     
     num_boards ++;
@@ -485,8 +494,7 @@ fail1:
     board->base = NULL;
 
 fail0:
-//    pci_disable_device(dev);
-    cvsoc_disable_device(dev);
+//    cvsoc_disable_device(dev);
     return failed_errno = r;
 }
 
@@ -499,7 +507,7 @@ static void hm2_cvsoc_remove(struct pci_dev *dev) {
         hm2_lowlevel_io_t *this = &board->llio;
 
         if (board->dev == dev) {
-            THIS_PRINT("dropping AnyIO board at %s\n", pci_name(dev));
+            THIS_PRINT("dropping AnyIO board at %s\n", dts_name(dev));
 
             hm2_unregister(&board->llio);
 

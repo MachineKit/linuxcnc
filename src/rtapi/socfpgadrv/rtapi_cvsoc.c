@@ -374,18 +374,18 @@ void pci_unregister_driver(struct pci_driver *driver)
     }
 }
 
-void __iomem *pci_ioremap_bar(struct pci_dev *dev, int bar)
+void __iomem *cvsoc_ioremap(struct cvsoc_dev *dev, int bar)
 {
 	void *mmio;
 	char path[256];
 
     rtapi_print_msg(RTAPI_MSG_DBG, "RTAPI_PCI: Map BAR %i\n", bar);
-
+/*
 	if (bar < 0 || bar >= 6) {
 		rtapi_print_msg(RTAPI_MSG_ERR, "Invalid PCI BAR %d\n", bar);
 		return NULL;
 	}
-
+*/
 	snprintf(path, sizeof(path), "%s/resource%i", dev->sys_path, bar);
 
 	/* Open the resource node */
@@ -435,7 +435,7 @@ inline void iounmap(volatile void __iomem *addr)
 
     return;
 }
-
+/*
 int cvsoc_enable_device(struct cvsoc_dev *dev)
 {
     FILE *stream;
@@ -445,7 +445,7 @@ int cvsoc_enable_device(struct cvsoc_dev *dev)
 
     rtapi_print_msg(RTAPI_MSG_DBG, "RTAPI_SOCFPGA: Enabling Device %s\n", dev->dev_name);
 
-    /* Enable the device */
+    // Enable the device //
     snprintf(path, sizeof(path), "%s/enable", dev->sys_path);
     stream = fopen(path, "w");
     if (stream == NULL) {
@@ -457,7 +457,7 @@ int cvsoc_enable_device(struct cvsoc_dev *dev)
     fprintf(stream, "1");
     fclose(stream);
         
-    /* Open the resource file... */
+    // Open the resource file... //
     snprintf(path, sizeof(path), "%s/resource", dev->sys_path);
     stream = fopen(path, "r");
     if (stream == NULL) {
@@ -467,7 +467,7 @@ int cvsoc_enable_device(struct cvsoc_dev *dev)
 		return -1;
 	}
         
-    /* ...and read in the data */
+    // ...and read in the data //
     for (i=0; i < 6; i++) {
         r=fscanf(stream, "%Lx %Lx %Lx", &L1, &L2, &L3);
         if (r != 3) {
@@ -488,7 +488,8 @@ int cvsoc_enable_device(struct cvsoc_dev *dev)
     fclose(stream);
     return 0;
 }
-
+*/ // Dont think this is needed
+/*
 int pci_disable_device(struct pci_dev *dev)
 {
     FILE *stream;
@@ -518,6 +519,7 @@ int pci_disable_device(struct pci_dev *dev)
 
     return r;
 }
+*/ // Dont think this is needed
 
 EXPORT_SYMBOL(rtapi_pci_get_device);
 EXPORT_SYMBOL(rtapi_pci_put_device);
@@ -525,10 +527,10 @@ EXPORT_SYMBOL(rtapi_pci_ioremap);
 EXPORT_SYMBOL(rtapi_pci_iounmap);
 
 EXPORT_SYMBOL(iounmap);
-EXPORT_SYMBOL(pci_enable_device);
-EXPORT_SYMBOL(pci_disable_device);
-EXPORT_SYMBOL(pci_register_driver);
-EXPORT_SYMBOL(pci_unregister_driver);
+//EXPORT_SYMBOL(cvsoc_enable_device);
+//EXPORT_SYMBOL(cvsoc_disable_device);
+EXPORT_SYMBOL(cvsoc_register_driver);
+EXPORT_SYMBOL(cvsoc_unregister_driver);
 EXPORT_SYMBOL(pci_ioremap_bar);
 
 

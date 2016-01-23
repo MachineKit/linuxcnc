@@ -92,9 +92,10 @@ struct pci_driver {
 
 //int pci_register_driver(struct pci_driver *driver);
 //void pci_unregister_driver(struct pci_driver *driver);
+/*
 int cvsoc_enable_device(struct cvsoc_dev *dev);
 int cvsoc_disable_device(struct cvsoc_dev *dev);
-
+*/
 #define pci_resource_start(dev, bar)    ((dev)->resource[(bar)].start)
 #define pci_resource_end(dev, bar)      ((dev)->resource[(bar)].end)
 #define pci_resource_flags(dev, bar)    ((dev)->resource[(bar)].flags)
@@ -109,7 +110,7 @@ int cvsoc_disable_device(struct cvsoc_dev *dev);
 void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar);
 inline void iounmap(volatile void __iomem *addr);
 
-static inline const char *pci_name(const struct pci_dev *pdev)
+static inline const char *dts_name(const struct pci_dev *pdev)
 {
     return pdev->dev_name;
 }
