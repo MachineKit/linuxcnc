@@ -26,44 +26,27 @@
 #define HM2_SOC_MAX_BOARDS  1
 
 
-// 
-// PCI Device IDs and SubSystem Device IDs
+//
+// Programming variables
+//
+// Note: just for the nano / atlas board initially
 //
 
 
-#define HM2_PCI_SSDEV_5I21     (0x3312)
+/* how long should we wait for DONE when programming socfpga systems */
+#define DONE_WAIT_CVSOCFPGA			2000 // :-)
 
-#define HM2_PCI_SSDEV_5I22_10  (0x3314)
-#define HM2_PCI_SSDEV_5I22_15  (0x3313)
+// the pci dev would corrospond to the uio dev in the soc system.
+// the only unique thing the uio device provides is easy access to the hardware memory
+// through /dev/uio0 device.
+// A design practice this is is dscuraged for future designs by Denx who provides u-boot
+// among others.   
+// Therefore there is a solid reason for creating an pci --> uio struct containing whats left from there.
+// And adding a dts_device_id for all devices that can benefit from utilising device-tree info.
+// To have a forward way towards partial fpga reconfiguration data structures relating to device tree overlays.
+// could come in handy. Once the soc / embedded systems migrate to 4.x+ kernels.
 
-#define HM2_PCI_SSDEV_5I23     (0x3315)
-
-#define HM2_PCI_SSDEV_5I24     (0x5124)
-#define HM2_PCI_SSDEV_5I25     (0x5125)
-#define HM2_PCI_SSDEV_6I25     (0x6125)
-
-
-//
-// PLX 9054 (5i22, 5i23, 4i68, 4i69)
-//
-// Note: also used for the PLX 9056 (3x20)
-//
-
-/* I/O register indices.
-*/
-#define CTRL_STAT_OFFSET_5I22	0x006C /* 5I22 32-bit control/status register. */
-
-/* bit number in 9054 GPIO register */
-/* yes, the direction control bits are not in the same order as the I/O bits */
-#define DONE_MASK_5I22			(1<<17)	/* GPI */
-#define _PROGRAM_MASK_5I22		(1<<16)	/* GPO, active low */
-#define DONE_ENABLE_5I22		(1<<18) /* GPI direction control, 1=input */
-#define _PROG_ENABLE_5I22		(1<<19) /* GPO direction control, 1=output */
-
-/* how long should we wait for DONE when programming 9054-based cards */
-#define DONE_WAIT_5I22			20000
-
-
+/*
 typedef struct {
     struct pci_dev *dev;
     void __iomem *base;
@@ -72,4 +55,4 @@ typedef struct {
     unsigned long data_base_addr;
     hm2_lowlevel_io_t llio;
 } hm2_pci_t;
-
+*/

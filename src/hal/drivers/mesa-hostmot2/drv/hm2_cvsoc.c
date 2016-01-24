@@ -58,24 +58,26 @@
 #error "This driver is for usermode threads only"
 #endif
 
-
-//#if defined(USERMODE_PCI) && defined(BUILD_SYS_USER_DSO)
+/*
+#if defined(USERMODE_PCI) && defined(BUILD_SYS_USER_DSO)
 #include <sys/io.h>
 #include <rtapi.h>
-//#include <rtapi/rtapi_pci.h>
+#include <rtapi/rtapi_pci.h>
 #else
 #include <linux/pci.h>
 #endif
+*/
 
 #include "rtapi.h"
 #include "rtapi_app.h"
+//#include "rtapi_math.h"
 #include "rtapi_string.h"
-#include "rtapi_pci.h"
+//#include "rtapi_pci.h"
 
 #include "hal.h"
 
-//#include "bitfile.h"
-#include "hostmot2-lowlevel.h"
+//#include "hal/drivers/mesa-hostmot2/bitfile.h"
+#include "hal/drivers/mesa-hostmot2/hostmot2-lowlevel.h"
 #include "hm2_cvsoc.h"
 
 
@@ -112,30 +114,30 @@ static int failed_errno=0; // errno of last failed registration
 
 
 
-/*
+/* // probe string for uio driver
 static const struct of_device_id uio_of_genirq_match[] = {
     { .compatible = "machkt,hm2reg-io-1.0", },
     { }
 };
 */
+
+// this struct contains the hm2 interface ip core info provided in the device-tree
+
 static struct dts_device_id hm2_cvsoc_tbl[] = {
         
     // 5i25
-    {
-        .vendor = machkt,
-        .name = hm2reg-io,
-        .group = hm2-socfpga,
-        .subgroup = 0,
+    {   
+        .address_width = 14,        //0x0000000E
+        .clocks = 2,                //0x00000002 number of clocks ?
+        .compatible {
+            .vendor = machkt,       //6D 61 63 68 6B 74 2C
+            .name = hm2reg-io,      //68 6D 32 72 65 67 2D 69 6F 2D 31 2E 30 00
+        } // (machkt,hm2reg-io-1.0.)
+        .data_width = 32,           // 0x00000020
+        .name = hm2-socfpga,        //68 6D 32 2D 73 6F 63 66 70 67 61 00 (hm2-socfpga.)
+        .reg = 0x00000001, 0x00040000, 0x00010000,// ?, address offset from bridge, address span (= max address +1)
     },
-/*
-    // 5i25
-    {
-        .vendor =  HM2_PCI_VENDORID_MESA,
-        .device = HM2_PCI_DEV_MESA5I25,
-        .subvendor = HM2_PCI_VENDORID_MESA,
-        .subdevice = hm2reg-io,
-    },
-*/    {0,},
+    {0,},
 };
 
 MODULE_DEVICE_TABLE(soc, hm2_cvsoc_tbl);
