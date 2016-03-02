@@ -19,6 +19,9 @@ services:
 before_install:
   - gem install package_cloud
   - .travis/get_sftp_key.sh 
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq sshpass
+
 
 env:
   global:
