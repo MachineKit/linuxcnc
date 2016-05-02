@@ -15,11 +15,12 @@ $(patsubst %, ../bin/%, $(USER_COMP_PY)) : ../bin/%: hal/user_comps/%.py
 
 PYTARGETS += $(patsubst %, ../bin/%, $(USER_COMP_PY))
 
-USER_COMP_COMP := $(sort $(wildcard hal/user_comps/*.comp))
-USER_COMP_BIN :=  $(patsubst hal/user_comps/%.comp, ../bin/%, $(USER_COMP_COMP))
-TARGETS += $(USER_COMP_BIN)
+# USER_COMP_COMPS is defined in hal/components/Submakefile
+USER_COMP_BINS := $(patsubst hal/user_comps/%.comp, ../bin/%, $(USER_COMP_COMPS))
 
-../bin/%: hal/user_comps/%.comp ../bin/comp  ../lib/liblinuxcnchal.so.0 $(INFILES)
+TARGETS += $(USER_COMP_BINS)
+
+../bin/%: hal/user_comps/%.comp ../bin/comp  ../lib/liblinuxcnchal.so.0 $(INFILES) userspace
 	$(Q)../bin/comp --install $<
 
 ifdef HAVE_LIBMODBUS3
