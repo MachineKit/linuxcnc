@@ -2408,29 +2408,32 @@ then
     AC_MSG_ERROR([python not found])
 fi
 
+BUILD_ASCIIDOC=no
+BUILD_MAN=no
+
 AC_MSG_CHECKING([whether to build documentation])
 AC_ARG_ENABLE(build-documentation,
-    [  --enable-build-documentation[=format]   Build documentation.
-                          Format may be "asciidoc" only.],
+    [  --enable-build-documentation   Build asciidoc documentation.],
     [
-        case "$enableval" in
-        asciidoc)
-            BUILD_DOCS=yes
-            BUILD_DOCS_PDF=no
-            BUILD_DOCS_HTML=no
-            AC_MSG_RESULT([ASCIIDOC build requested])
-	;;
-
-        *)
-            BUILD_DOCS=no
-            AC_MSG_RESULT([no])
-        ;;
-    esac
+	BUILD_ASCIIDOC=yes
+        AC_MSG_RESULT([ASCIIDOC build requested])
     ],
     [
-        BUILD_DOCS=no
         AC_MSG_RESULT([no])
     ])
+
+AC_MSG_CHECKING([whether to build man pages])
+AC_ARG_ENABLE(build-man,
+    [  --enable-build-man   Build man pages.],
+    [
+	BUILD_MAN=yes
+        AC_MSG_RESULT([MAN page build requested])
+    ],
+    [
+        AC_MSG_RESULT([no])
+    ])
+
+
 
 # don't need this crap, our asciidocs are generated or already present
 # Programs required for building all documentation
@@ -2548,9 +2551,8 @@ AC_ARG_ENABLE(build-documentation,
 #        AC_MSG_RESULT(yes)
 #    fi
 #fi
-AC_SUBST(BUILD_DOCS)
-AC_SUBST(BUILD_DOCS_PDF)
-AC_SUBST(BUILD_DOCS_HTML)
+AC_SUBST(BUILD_ASCIIDOC)
+AC_SUBST(BUILD_MAN)
 
 ##############################################################################
 # Section 4 - Important headers, functions and gloabl defines.               #
@@ -3067,7 +3069,7 @@ fi
 ##############################################################################
 AC_CONFIG_FILES([../scripts/gen-rtapi.ini.sh])
 AC_CONFIG_FILES([../scripts/check-build-vs-configure-sha], [chmod +x ../scripts/check-build-vs-configure-sha])
-AC_CONFIG_FILES([../man/man1/linuxcnc.1])
+AC_CONFIG_FILES([../man/legacy/man1/linuxcnc.1])
 AC_CONFIG_FILES([../scripts/linuxcnc], [chmod +x ../scripts/linuxcnc])
 AC_CONFIG_FILES([../scripts/halrun], [chmod +x ../scripts/halrun])
 AC_CONFIG_FILES([../scripts/rip-environment], [chmod +x ../scripts/rip-environment])
