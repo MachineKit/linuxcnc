@@ -187,9 +187,8 @@ class Config(object):
         self.MSGFMT = "@MSGFMT@"
         self.XGETTEXT = "@XGETTEXT@"
 
-        self.BUILD_DOCS = "@BUILD_DOCS@"
-        self.BUILD_DOCS_PDF = "@BUILD_DOCS_PDF@"
-        self.BUILD_DOCS_HTML = "@BUILD_DOCS_HTML@"
+        self.BUILD_MAN = "@BUILD_MAN@"
+        self.BUILD_ASCIIDOC = "@BUILD_ASCIIDOC@"
         self.PYTHON = "@PYTHON@"
 
 #

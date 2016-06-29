@@ -11,22 +11,25 @@ include $(patsubst %.icomp, $(BASEPWD)/halcomp-srcs/%.mak, $(ICOMPS))
 else
 ICOMPS := $(sort $(wildcard $(HALICOMPDIR)/*.icomp))
 
-ICOMP_MANPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/man9/%.9icomp, \
+ICOMP_MANPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/legacy/man9/%.9icomp, \
 	$(ICOMPS))
 
-ICOMP_DOCPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/doc/man9/%.asciidoc, \
+ICOMP_DOCPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/man9/%.asciidoc, \
 	$(ICOMPS))
 
 i_manpages: $(ICOMP_MANPAGES)
 i_docpages: $(ICOMP_DOCPAGES)
 
-TARGETS += i_manpages
-.PHONY: i_manpages
-
-ifeq ($(BUILD_DOCS),yes)
-TARGETS += i_docpages
-.PHONY: i_docpages
+ifeq ($(BUILD_ASCIIDOC),yes)
+    TARGETS += i_docpages
+    .PHONY: i_docpages
 endif
+
+ifeq ($(BUILD_MAN),yes)
+    TARGETS += i_manpages
+    .PHONY: i_manpages
+endif
+
 
 ifeq ($(TRIVIAL_BUILD)+$(BUILD_THREAD_MODULES),no+yes)
 -include $(patsubst %.icomp, $(BASEPWD)/halcomp-srcs/%.mak,\
@@ -40,18 +43,18 @@ obj-m += \
 	$(patsubst hal/i_components/%.icomp, %.o, $(ICOMPS))
 endif
 
-ICOMP_MANPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/man9/%.9icomp, \
+ICOMP_MANPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/legacy/man9/%.9icomp, \
 	$(ICOMPS))
 
-$(ICOMP_MANPAGES): ../man/man9/%.9icomp: $(HALICOMPDIR)/%.icomp ../bin/instcomp
+$(ICOMP_MANPAGES): ../man/legacy/man9/%.9icomp: $(HALICOMPDIR)/%.icomp ../bin/instcomp
 	$(ECHO) Making icomp manpage $(notdir $@)
 	@mkdir -p $(dir $@)
 	$(Q)../bin/instcomp --document -o $@ $<
 
-ICOMP_DOCPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/doc/man9/%.asciidoc, \
+ICOMP_DOCPAGES := $(patsubst $(HALICOMPDIR)/%.icomp, ../man/man9/%.asciidoc, \
 	$(ICOMPS))
 
-$(ICOMP_DOCPAGES): ../man/doc/man9/%.asciidoc: $(HALICOMPDIR)/%.icomp ../bin/instcomp
+$(ICOMP_DOCPAGES): ../man/man9/%.asciidoc: $(HALICOMPDIR)/%.icomp ../bin/instcomp
 	$(ECHO) Making icomp docpage $(notdir $@)
 	@mkdir -p $(dir $@)
 	$(Q)../bin/instcomp --ascii-document 	\
@@ -87,7 +90,7 @@ endif # BUILD_ALL_FLAVORS == yes
 #.PHONEY: clean
 # now done directly in main Makefile
 #clean:
-#	-rm -f ../man/man9/*.9icomp
-#	-rm -f ../man/doc/man9/*.asciidoc
+#	-rm -f ../man/legacy/man9/*.9icomp
+#	-rm -f ../man/man9/*.asciidoc
 
 
