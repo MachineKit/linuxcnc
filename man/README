@@ -1,0 +1,24 @@
+The Machinekit manual page documents are now in asciidoc format.
+
+They are available on-line in html at www.machinekit.io/docs
+
+If you require local rendering of the manuals in a terminal,
+a script called `mank` has been added to the executables.
+
+It requires the installation of elinks ( very light text browser )
+and `asciidoctor` ( asciidoc to html converter )
+
+These are available in packages of those names from standard
+Debian repos.
+
+Invoke with 
+mank [name of component/utility/function]
+
+eg.
+mank axis-remote 
+or 
+mank debounce
+
+(the .asciidoc extension is completed by the script)
+
+

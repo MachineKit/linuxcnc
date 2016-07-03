@@ -1,0 +1,26 @@
+# !/bin/bash
+
+if [ ! -f /usr/bin/elinks ]; then
+    echo "This script requires 'elinks', install it and run again"
+    exit 1
+fi
+
+if [ ! -f /usr/bin/asciidoctor ]; then
+    echo "This script requires 'asciidoctor', install it and run again"
+    exit 1
+fi
+
+if [ "$RIP" == "yes" ]; then
+    filn=$(find $EMC2_HOME/man -type f -name $1.asciidoc)
+else
+    filn=$(find /usr/share/man /usr/local/man /usr/local/share/man -type f -name $1.asciidoc)
+fi
+
+asciidoctor $filn -o - | elinks -dump
+
+read -p "Press [Enter] to exit: "
+clear
+exit 0
+
+
+ 
