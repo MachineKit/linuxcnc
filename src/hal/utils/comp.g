@@ -1228,7 +1228,7 @@ def main():
 
     for k, v in opts:
         if k in ("-u", "--userspace"):
-            raise SystemExit, "Error: instcomp does not support userspace components"
+            userspace = True
         if k in ("-i", "--install"):
             mode = INSTALL
         if k in ("-c", "--compile"):
