@@ -713,8 +713,8 @@ depclean:
 	-rm -rf depends
 
 docclean:
-	-rm -f ../man/man9/*.9icomp
-	-rm -f ../man/doc/man9/*.asciidoc
+	# need to delete all generated .asciidoc and leave the static ones
+	find ../man/man9/* -maxdepth 0 ! -name "*.9.*" -exec rm -rf '{}' \;
 
 clean: depclean modclean docclean
 	find . -name '*.o' |xargs rm -f
@@ -847,11 +847,6 @@ ifeq ($(USERMODE_PCI),yes)
 endif
 
 install-kernel-indep: install-dirs
-	$(FILE) ../man/man1/*.1 $(DESTDIR)$(mandir)/man1
-	$(FILE) ../man/man9/*.9 $(DESTDIR)$(mandir)/man9
-	$(FILE) $(filter-out %/skeleton.3hal, $(wildcard ../man/man3/*.3hal)) $(DESTDIR)$(mandir)/man3
-	$(FILE) $(filter-out %/skeleton.3rtapi, $(wildcard ../man/man3/*.3rtapi)) $(DESTDIR)$(mandir)/man3
-	$(FILE) $(filter-out %/skeleton.9comp, $(wildcard ../man/man9/*.9comp)) $(DESTDIR)$(mandir)/man9
 	$(FILE) objects/*.msg $(DESTDIR)$(tcldir)/msgs
 	$(EXE) ../scripts/realtime $(DESTDIR)$(bindir)
 	$(EXE) ../scripts/halrun $(DESTDIR)$(bindir)
@@ -1816,8 +1811,7 @@ swish:
 		$(dir $(BASEPWD))share/axis/tcl \
 		$(dir $(BASEPWD))lib/python \
 		$(dir $(BASEPWD))scripts \
-		$(dir $(BASEPWD))configs \
-		$(dir $(BASEPWD))man/man1
+		$(dir $(BASEPWD))configs 
 
 # When you depend on objects/var-ZZZ you are depending on the contents of the
 # variable ZZZ, which is assumed to depend on a Makefile, a Submakefile, or

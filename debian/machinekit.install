@@ -28,8 +28,8 @@ usr/share/doc/linuxcnc/README.axis
 usr/share/linuxcnc/*
 usr/share/linuxcnc/stepconf/*.glade
 usr/share/locale/*/LC_MESSAGES/*.mo
-usr/share/man/man1/*
-usr/share/man/man9/*
+#usr/share/man/legacy/man1/*
+#usr/share/man/legacy/man9/*
 usr/share/gtksourceview-2.0/
 usr/share/gscreen
 usr/share/gmoccapy
