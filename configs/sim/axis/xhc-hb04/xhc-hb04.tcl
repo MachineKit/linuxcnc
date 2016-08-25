@@ -89,16 +89,17 @@ proc is_uniq {list_name} {
   return 1 ;# unique
 } ;# is_uniq
 
+## formatting of `show pin <pin-name>` has changed
+## however if there is no match a blank line will be output
+## beneath the header - match that
+## trying to match a complex format that may change is madness.
+
 proc pin_exists {name} {
   set line [lindex [split [show pin $name] \n] 2]
-  if {"$line" == ""} {
+  if {"$line" == "\n"} {
     return 0 ;# fail
-  }
-  if [catch {scan $line "%d %s %s %s%s" owner type dir value pinname} msg] {
-     return 0 ;# fail
   } else {
-     #puts stderr "OK:$owner $type $dir $value $pinname"
-     return 1 ;# ok
+    return 1 ;# ok
   }
 } ;# pin_exists
 
