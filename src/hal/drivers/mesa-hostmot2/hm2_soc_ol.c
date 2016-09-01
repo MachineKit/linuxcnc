@@ -1,5 +1,7 @@
 //
-//    Copyright (C) 2007-2008 Sebastian Kuzminsky
+//    Copyright (C) 2015-2016  Michael Brown, Devin Hughes, Michael Haberler
+//
+//    loosely based on hm2_pci.c, Copyright (C) 2007-2008 Sebastian Kuzminsky
 //
 //    This program is free software; you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -19,13 +21,14 @@
 //    Copyright (C) Holotronic 2016-2017
 //
 //    some polishings Michael Haberler 2016
+//    Copyright (C) 2016 Michael Haberler
 //
 //    Rewritten for overlay based FPGA manager interface
 //    Copyright (C) 2016 Devin Hughes, JD Squared
 
-/* a matching device tree overlay:
+/* a matching device tree overlay - Altera Terasic DE0-Nano:
 
-/dts-v1/ /plugin/;
+/dts-v1/;/plugin/;
 
 / {
 	fragment@0 {
@@ -39,8 +42,8 @@
 			ranges = <0x00040000 0xff240000 0x00010000>;
 			firmware-name = "socfpga/DE0_NANO.rbf";
 
-			hm2reg_io_0: hm2-socfpg0@0x40000 {
-				compatible = "hm2reg_io,generic-uio,ui_pdrv";
+			hm2reg_io_0: hm2-socfpga0@0x40000 {
+				compatible = "generic-uio,ui_pdrv";
 				reg = <0x40000 0x10000>;
 				interrupt-parent = <0x2>;
 				interrupts = <0 43 1>;
@@ -51,7 +54,32 @@
 		};
 	};
 };
-# /usr/src/linux-headers-4.1.17-ltsi-rt17-gab2edea/scripts/dtc/dtc -I dts -O dtb -o hm2reg_uio.dtbo hm2reg_uio-irq.dts
+
+Xilinx Zyn, MYIR Z-Turn:
+
+/dts-v1/; /plugin/;
+
+/ {
+  fragment@0 {
+    target = <&base_fpga_region>;
+    #address-cells = <1>;
+    #size-cells = <1>;
+    __overlay__ {
+      #address-cells = <1>;
+      #size-cells = <1>;
+
+          firmware-name = "zynq/zturn_ztio.bit.bin";
+
+          hm2reg_io_0: hm2-socfpga0@0x43C00000 {
+                compatible = "generic-uio,ui_pdrv";
+                reg = < 0x43C00000 0x00010000 >;
+                interrupt-parent = <&intc>;
+                interrupts = <0 29 1>;
+          };
+    };
+  };
+};
+
 see configs/hm2-soc-stepper/irqtest.hal for a usage example
  */
 //---------------------------------------------------------------------------//
@@ -96,6 +124,8 @@ see configs/hm2-soc-stepper/irqtest.hal for a usage example
 
 #define HM2REG_IO_0_SPAN 65536
 
+// on a time-critical path. Unlikely to happen - never seen so far.
+#define WARN_ON_UNALIGNED_ACCESS 1
 
 #define MAXUIOIDS  100
 #define MAXNAMELEN 256
@@ -105,39 +135,35 @@ MODULE_AUTHOR("Michael Brown & Michael Haberler & Devin Hughes");
 MODULE_DESCRIPTION("Low level driver for HostMot2 on SoC Based Devices");
 MODULE_SUPPORTED_DEVICE("Mesa-AnythingIO-5i25");
 
-static char *config[HM2_SOC_MAX_BOARDS];
-RTAPI_MP_ARRAY_STRING(config, HM2_SOC_MAX_BOARDS,
-		      "config string for the AnyIO boards (see hostmot2(9) manpage)")
+// module-level params
 static int debug;
-RTAPI_MP_INT(debug, "turn on extra debug output");
+RTAPI_IP_INT(debug, "turn on extra debug output");
 
-static char *name = "hm2-socfpg0";
-RTAPI_MP_STRING(name, "logical device name, default hm2-socfpg0hm2-socfpg0");
+// instance-level params
+static char *config;
+RTAPI_IP_STRING(config, "config string for the AnyIO boards (see hostmot2(9) manpage)")
+
+//static char *name = "hm2-socfpg0";
+//RTAPI_IP_STRING(name, "logical device name, default hm2-socfpg0");
 
 static char *descriptor = NULL;
-RTAPI_MP_STRING(descriptor, ".bin file with encoded fwid protobuf descriptor message");
+RTAPI_IP_STRING(descriptor, ".bin file with encoded fwid protobuf descriptor message");
 
 static int no_init_llio;
-RTAPI_MP_INT(no_init_llio, "debugging - if 1, do not set any llio fields (like num_leds");
+RTAPI_IP_INT(no_init_llio, "debugging - if 1, do not set any llio fields (like num_leds");
 
-static int timer1;
-RTAPI_MP_INT(timer1, "rate for hm2 Timer1 IRQ, 0: IRQ disabled");
-
+static int num;
+RTAPI_IP_INT(num, "hm2 instance number, used for <boardname>.<num>.<pinname>");
 
 static int comp_id;
-static hm2_soc_t board[HM2_SOC_MAX_BOARDS];
-static int num_boards;
-static int failed_errno = 0; // errno of last failed registration
 
-/* Pick a configfs folder that is unlikely to conflict with other overlays */
-static char *configfs_dir = "/sys/kernel/config/device-tree/overlays/hm2_soc_ol";
-static char *configfs_path = "/sys/kernel/config/device-tree/overlays/hm2_soc_ol/path";
-static char *configfs_status = "/sys/kernel/config/device-tree/overlays/hm2_soc_ol/status";
-static int zero = 0;
+/* derive configfs folder from instance name which is unique */
+static char *configfs_dir = "/sys/kernel/config/device-tree/overlays/%s";
+static char *configfs_path = "/sys/kernel/config/device-tree/overlays/%s/path";
+static char *configfs_status = "/sys/kernel/config/device-tree/overlays/%s/status";
 
 static int hm2_soc_mmap(hm2_soc_t *brd);
-static int waitirq(void *arg, const hal_funct_args_t *fa); // HAL thread funct
-static int fpga_status();
+static int fpga_status(const char *name);
 static char *strlwr(char *str);
 static int locate_uio_device(hm2_soc_t *brd, const char *name);
 
@@ -146,48 +172,29 @@ static int locate_uio_device(hm2_soc_t *brd, const char *name);
 //
 static int hm2_soc_read(hm2_lowlevel_io_t *this, u32 addr, void *buffer, int size) {
     hm2_soc_t *brd = this->private;
-    int i;
-    u32* src = (u32*) (brd->base + addr);
-    u32* dst = (u32*) buffer;
 
-    /* Per Peter Wallace, all hostmot2 access should be 32 bits and 32-bit aligned */
-    /* Check for any address or size values that violate this alignment */
-    if ( ((addr & 0x3) != 0) || ((size & 0x03) != 0) ){
-        u16* dst16 = (u16*) dst;
-        u16* src16 = (u16*) src;
-        /* hm2_read_idrom performs a 16-bit read, which seems to be OK, so let's allow it */
-        if ( ((addr & 0x1) != 0) || (size != 2) ){
-            LL_ERR( "hm2_soc_read: Unaligned Access: %08x %04x\n", addr,size);
-            memcpy(dst, src, size);
-            return 1;  // success
-        }
-        dst16[0] = src16[0];
-        return 1;  // success
+#ifdef WARN_ON_UNALIGNED_ACCESS
+    /* hm2_read_idrom performs a 16-bit read, which seems to be OK, so let's allow it */
+    if ( ((addr & 0x1) != 0) || (((size & 0x03) != 0)  && (size != 2))) {
+	LL_ERR( "hm2_soc_read: Unaligned Access: %08x %04x\n", addr,size);
     }
-    for (i=0; i<(size/4); i++) {
-        dst[i] = src[i];
-    }
+#endif
+    memcpy(buffer, brd->base + addr, size);
     return 1;  // success
 }
 
 static int hm2_soc_write(hm2_lowlevel_io_t *this, u32 addr, void *buffer, int size) {
     hm2_soc_t *brd = this->private;
-    int i;
-    u32* src = (u32*) buffer;
-    u32* dst = (u32*) (brd->base + addr);
 
-    /* Per Peter Wallace, all hostmot2 access should be 32 bits and 32-bit aligned */
-    /* Check for any address or size values that violate this alignment */
-    if ( ((addr & 0x3) != 0) || ((size & 0x03) != 0) ){
-        LL_ERR( "hm2_soc_write: Unaligned Access: %08x %04x\n", addr,size);
-        memcpy(dst, src, size);
-        return 1;  // success
+#ifdef WARN_ON_UNALIGNED_ACCESS
+    // Per Peter Wallace, all hostmot2 access should be 32 bits and 32-bit aligned
+    // Check for any address or size values that violate this alignment
+    if ((addr & 0x3) || (size & 0x3)) {
+	LL_ERR( "hm2_soc_write: Unaligned Access: %08x %04x\n", addr, size);
     }
-
-    for (i=0; i<(size/4); i++) {
-        dst[i] = src[i];
-    }
-    return 1;  // success
+#endif
+    memcpy(brd->base + addr, buffer, size);
+    return 1;
 }
 
 // when no firmware= was specified, hm2_register() will read/write from the
@@ -232,6 +239,7 @@ static int hm2_soc_program_fpga(hm2_lowlevel_io_t *this,
 
     int rc;
     hm2_soc_t *brd =  this->private;
+    char buf[MAXNAMELEN];
 
     LL_DBG("soc_program_fpga");
 
@@ -241,28 +249,31 @@ static int hm2_soc_program_fpga(hm2_lowlevel_io_t *this,
     // on the firmware path to the "path" node and it will do all of the
     // magic.
 
-    DIR* dir = opendir(configfs_dir);
+    rtapi_snprintf(buf, sizeof(buf), configfs_dir, brd->name);
+
+    DIR* dir = opendir(buf);
     if(dir) {
         // old config left behind? - Directory always appears empty
         // so okay to call rmdir()
-        if(rmdir(configfs_dir) < 0) {
-            LL_ERR("rmdir(%s) failed: %s", configfs_dir, strerror(errno));
+        if(rmdir(buf) < 0) {
+            LL_ERR("rmdir(%s) failed: %s", buf, strerror(errno));
             return -EIO;
         }
     }
 
     // umask will clip permissions to match parent
-    if(mkdir(configfs_dir, 0777) < 0) {
-        LL_ERR("mkdir(%s) failed: %s", configfs_dir, strerror(errno));
+    if(mkdir(buf, 0777) < 0) {
+        LL_ERR("mkdir(%s) failed: %s", buf, strerror(errno));
         return -EIO;
     }
 
     int fd;
+    rtapi_snprintf(buf, sizeof(buf), configfs_path, brd->name);
 
     // Spin to give configfs time to make the files
     int retries = 10;
     while(retries > 0) {
-        fd = open(configfs_path, O_WRONLY);
+        fd = open(buf, O_WRONLY);
         if (fd != -1)
             break;
         retries--;
@@ -270,7 +281,7 @@ static int hm2_soc_program_fpga(hm2_lowlevel_io_t *this,
     }
 
     if (fd < 0) {
-        LL_ERR("open(%s) failed: %s", configfs_path, strerror(errno));
+        LL_ERR("open(%s) failed: %s", buf, strerror(errno));
         return -EIO;
     }
 
@@ -288,7 +299,7 @@ static int hm2_soc_program_fpga(hm2_lowlevel_io_t *this,
     // Spin to give fpga time to program
     retries = 12;
     while(retries > 0) {
-        brd->fpga_state = fpga_status();
+        brd->fpga_state = fpga_status(brd->name);
         if (brd->fpga_state == DTOV_STAT_APPLIED)
             break;
         retries--;
@@ -296,16 +307,17 @@ static int hm2_soc_program_fpga(hm2_lowlevel_io_t *this,
     }
 
     if (brd->fpga_state != DTOV_STAT_APPLIED) {
-        LL_ERR("DTOverlay status is not applied post programming: state=%d",
-            brd->fpga_state);
+        LL_ERR("DTOverlay status is not applied post programming: name=%s state=%d",
+	       brd->name, brd->fpga_state);
         return -ENOENT;
     }
 
     rc = hm2_soc_mmap(this->private);
     if (rc) {
-        LL_ERR("soc_mmap_fail");
+        LL_ERR("soc_mmap_fail %s", brd->name);
         return -EINVAL;
     }
+
     return 0;
 }
 
@@ -326,14 +338,14 @@ static int hm2_soc_mmap(hm2_soc_t *brd) {
     int retries = 10;
     int ret;
     while(retries > 0) {
-	ret = locate_uio_device(brd, name);
+	ret = locate_uio_device(brd, brd->name);
 	if (ret == 0)
 	    break;
         retries--;
         usleep(200000);
     }
     if (ret || (brd->uio_dev == NULL)) {
-	LL_ERR("failed to map %s to /dev/uioX\n", name);
+	LL_ERR("failed to map %s to /dev/uioX\n", brd->name);
 	return ret;
     }
     brd->uio_fd = open(brd->uio_dev , ( O_RDWR | O_SYNC ));
@@ -352,9 +364,9 @@ static int hm2_soc_mmap(hm2_soc_t *brd) {
     }
 
     if (debug)
-    rtapi_print_hex_dump(RTAPI_MSG_INFO, RTAPI_DUMP_PREFIX_OFFSET,
-		         16, 1, (const void *)virtual_base, 4096, 1,
-		         "hm2 regs at %p:", virtual_base);
+	rtapi_print_hex_dump(RTAPI_MSG_INFO, RTAPI_DUMP_PREFIX_OFFSET,
+			     16, 1, (const void *)virtual_base, 4096, 1,
+			     "hm2 regs at %p:", virtual_base);
 
     // this duplicates stuff already happening in hm2_register - no harm
     u32 reg = *((u32 *)(virtual_base + HM2_ADDR_IOCOOKIE));
@@ -381,27 +393,40 @@ static int hm2_soc_mmap(hm2_soc_t *brd) {
 
     // use BoardNameHigh as board name - see http://freeby.mesanet.com/regmap
     rtapi_snprintf(this->name, sizeof(this->name), "hm2_%4.4s.%d",
-                   idrom->board_name + 4, num_boards);
+                   idrom->board_name + 4, brd->num);
     strlwr(this->name);
     brd->base = (void *)virtual_base;
     // now it's safe to read/write
     this->read = hm2_soc_read;
     this->write = hm2_soc_write;
+
+    // handle irq setup request
+    if (this->host_wants_irq != 0)
+        this->irq_fd = brd->uio_fd;
+
     return 0;
 }
 
 static int hm2_soc_register(hm2_soc_t *brd,
 			    const char *name,
+			    const char *config,
 			    void *fwid,
-			    size_t fwid_len)
+			    size_t fwid_len,
+			    int inst_id,
+			    int no_init_llio,
+			    int num)
 {
 
     brd->name = name;
+    brd->config = config;
+    brd->no_init_llio = no_init_llio;
+    brd->num = num;
 
     // no directory to check state yet, so it's unknown
     brd->fpga_state = -1;
 
-    brd->llio.comp_id = comp_id;
+    // pins are owned by instance so they go away on delinst
+    brd->llio.comp_id = inst_id;
 
     if (no_init_llio) {
 	// defer to initialization in hm2_register()
@@ -449,7 +474,7 @@ static int hm2_soc_register(hm2_soc_t *brd,
     brd->llio.private = brd;
     hm2_lowlevel_io_t *this =  &brd->llio;
 
-    int r = hm2_register(this, config[0]);
+    int r = hm2_register(this, (char *)brd->config);
     if (r != 0) {
         THIS_ERR("hm2_soc_ol_board fails HM2 registration\n");
         close(brd->uio_fd);
@@ -458,7 +483,6 @@ static int hm2_soc_register(hm2_soc_t *brd,
     }
 
     LL_PRINT("initialized AnyIO hm2_soc_ol_board %s on %s\n", brd->name, brd->uio_dev);
-    num_boards++;
     return 0;
 }
 
@@ -473,12 +497,25 @@ static int hm2_soc_munmap(hm2_soc_t *brd) {
     return(1);
 }
 
-int rtapi_app_main(void) {
+
+static int instantiate(const int argc, const char**argv)
+{
     int r = 0;
     size_t nread = 0;
     void *blob = NULL;
 
     LL_PRINT("loading Mesa AnyIO HostMot2 socfpga overlay driver version " HM2_SOCFPGA_VERSION "\n");
+
+    // argv[0]: component name
+    const char *name = argv[1]; // instance name
+    hm2_soc_t *brd;
+
+    // allocate a named instance, and HAL memory for the instance data
+    int inst_id = hal_inst_create(name, comp_id,
+				  sizeof(hm2_soc_t),
+				  (void **)&brd);
+    if (inst_id < 0)
+	return -1;
 
     // read a custom fwid message if given
     if (descriptor) {
@@ -512,87 +549,41 @@ int rtapi_app_main(void) {
 	LL_DBG("custom descriptor '%s' size %zu", descriptor, nread);
     }
 
-    comp_id = hal_init(HM2_LLIO_NAME);
-    if (comp_id < 0) return comp_id;
-
-    hm2_soc_t *brd = &board[0];
-    memset(brd, 0,  sizeof(hm2_soc_t));
-
-
-    r = hm2_soc_register(brd, name, blob, nread);
+    r = hm2_soc_register(brd, name, config, blob, nread,
+			 inst_id, no_init_llio, num);
+    if (blob)
+	free(blob);
     if (r != 0) {
         LL_ERR("error registering UIO driver\n");
-        hal_exit(comp_id);
-        return r;
+        return -1;
     }
-
-    if (failed_errno) {
-        // at least one card registration failed
-        hal_exit(comp_id);
-        r = hm2_soc_munmap(brd);
-        return r;
-    }
-
-    if (num_boards == 0) {
-        // no cards were detected
-        LL_PRINT("error - no supported cards detected\n");
-        hal_exit(comp_id);
-        r = hm2_soc_munmap(brd);
-        return r;
-    }
-
-    // enable time IRQ's
-    if (timer1) {
-
-	brd->pins = hal_malloc(sizeof(hm2_soc_pins_t));
-	if (!brd->pins)
-	    return -1;
-
-	if (hal_pin_u32_newf(HAL_OUT, &brd->pins->irq_count, comp_id, "hm2.%d.irq-count", 0) ||
-	    hal_pin_u32_newf(HAL_OUT, &brd->pins->irq_missed, comp_id, "hm2.%d.irq-missed", 0) ||
-	    hal_pin_u32_newf(HAL_OUT, &brd->pins->write_errors, comp_id, "hm2.%d.write-errors", 0) ||
-	    hal_pin_u32_newf(HAL_OUT, &brd->pins->read_errors, comp_id, "hm2.%d.read-errors", 0))
-	    return -1;
-
-	hal_export_xfunct_args_t xfunct_args = {
-	    .type = FS_XTHREADFUNC,
-	    .funct.x = waitirq,
-	    .arg = brd,
-	    .uses_fp = 0,
-	    .reentrant = 0,
-	    .owner_id = comp_id
-	};
-	if ((r = hal_export_xfunctf(&xfunct_args, "waitirq.%d", 0)) != 0) {
-	    LL_PRINT("hal_export waitirq failed - %d\n", r);
-	    hal_exit(comp_id);
-	    r = hm2_soc_munmap(brd);
-	    return r;
-	}
-
-	// set timer1 period:
-	hm2_soc_write(&brd->llio, HM2_DPLL_CONTROL_REG_0 , (void *)&timer1, sizeof(timer1));
-	// and enable timer 1 interrupt
-	int val = 2;
-	hm2_soc_write(&brd->llio, HM2_IRQ_STATUS_REG , (void *)&val, sizeof(val));
-
-    } else {
-	LL_PRINT("timer1 argument 0 - waitirq function not exported\n");
-    }
-    hal_ready(comp_id);
     return 0;
 }
 
+static int delete(const char *name, void *inst, const int inst_size)
+{
+    hm2_soc_t *brd = (hm2_soc_t *)inst;
+    char buf[MAXNAMELEN];
+
+    hm2_unregister(&brd->llio);
+    int r = hm2_soc_munmap(brd);
+    rtapi_snprintf(buf, sizeof(buf), configfs_dir, name);
+    rmdir(buf);
+    return r;
+}
 
 void rtapi_app_exit(void)
 {
-    hm2_soc_t *brd = &board[0];
-
-    hm2_unregister(&brd->llio);
-    hm2_soc_munmap(brd);
-    // Clean up the overlay
-    rmdir(configfs_dir);
-    LL_PRINT("UIO driver unloaded\n");
     hal_exit(comp_id);
+}
+
+int rtapi_app_main(void) {
+
+    comp_id = hal_xinit(TYPE_RT, 0, 0, instantiate, delete, HM2_LLIO_NAME);
+    if (comp_id < 0)
+	return comp_id;
+    hal_ready(comp_id);
+    return 0;
 }
 
 
@@ -616,13 +607,19 @@ static struct dt_ol_state dt_ol_states[] = {
     { -1, NULL }
 };
 
-static int fpga_status() {
+static int fpga_status(const char *name) {
+
+    char buf[MAXNAMELEN];
+
     // The device tree status node only has two choices. If the state is applied
     // then the fpga was configured correctly, and any modules are probed.
-    int fd = open(configfs_status, O_RDONLY);
+
+    rtapi_snprintf(buf, sizeof(buf), configfs_status, name);
+
+    int fd = open(buf, O_RDONLY);
     if (fd < 0) {
         LL_ERR( "Failed to open sysfs entry '%s': %s\n",
-                configfs_status, strerror(errno));
+                buf, strerror(errno));
         return -errno;
     }
 
@@ -631,7 +628,7 @@ static int fpga_status() {
     int len = read(fd, status, sizeof(status));
     if (len < 0)  {
         LL_ERR( "Failed to read sysfs entry '%s': %s\n",
-                configfs_status, strerror(errno));
+                buf, strerror(errno));
         close(fd);
         return -errno;
     }
@@ -646,7 +643,7 @@ static int fpga_status() {
     }
 
     // state wasn't recognized from array
-    LL_ERR( "FPGA overlay unknown status: %s", status);
+    LL_ERR( "FPGA overlay unknown status: %s %s", buf, status);
     return -EINVAL;
 }
 
@@ -667,34 +664,5 @@ static int locate_uio_device(hm2_soc_t *brd, const char *name)
 
     rtapi_snprintf(buf, sizeof(buf), "/dev/uio%d", uio_id);
     brd->uio_dev = strdup(buf);
-    return 0;
-}
-
-
-static int waitirq(void *arg, const hal_funct_args_t *fa)
-{
-    hm2_soc_t *brd = arg;
-    uint32_t info;
-    ssize_t nb;
-
-    info = 1; /* unmask */
-
-    nb = write(brd->uio_fd, &info, sizeof(info));
-    if (nb < sizeof(info)) {
-	*(brd->pins->write_errors) += 1;
-    }
-
-    info = 0;
-    // wait for IRQ
-    nb = read(brd->uio_fd, &info, sizeof(info));
-    if (nb != sizeof(info)) {
-	*(brd->pins->read_errors) += 1;
-    }
-    *(brd->pins->irq_count) += 1;
-    *(brd->pins->irq_missed) = info - *(brd->pins->irq_count);
-
-    // clear pending IRQ
-    hm2_soc_write(&brd->llio, HM2_CLEAR_IRQ_REG, &zero, sizeof(zero));
-
     return 0;
 }

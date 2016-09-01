@@ -440,9 +440,6 @@ int Interp::_execute(const char *command)
 		      (_setup.mdi_interrupt)) { 
 
 		      status = convert_control_functions(eblock, &_setup);
-		      // a prolog might yield INTERP_EXECUTE_FINISH too
-		      if (status == INTERP_EXECUTE_FINISH) 
-			  _setup.mdi_interrupt = true;
 		      CHP(status);
 		      if (_setup.mdi_interrupt) {
 			  _setup.mdi_interrupt = false;
@@ -602,7 +599,8 @@ int Interp::remap_finished(int phase)
 		// if ((status == INTERP_OK) || (status == INTERP_ENDFILE) || (status == INTERP_EXIT) || (status == INTERP_EXECUTE_FINISH)) {
 		// leftover items finished. Drop a remapping level.
 
-		CHP(leave_remap());
+		if (status != INTERP_EXIT) // Don't drop remap lev. at prog exit
+		    CHP(leave_remap());
 		logRemap("executing block leftover items complete, status=%s  remap_level=%d call_level=%d tc=%d probe=%d input=%d mdi_interrupt=%d  line=%d backtoline=%d",
 			 interp_status(status),_setup.remap_level,_setup.call_level,_setup.toolchange_flag,
 			_setup.probe_flag,_setup.input_flag,_setup.mdi_interrupt,_setup.sequence_number,

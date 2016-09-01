@@ -1198,6 +1198,10 @@ static int loadrt_cmd(const bool instantiate, // true if called from do_newinst
 	return -EPERM;
     }
 
+    if (strcmp(mod_name, "threads") == 0)
+	halcmd_info("the threads module is deprecated,"
+		    " consider replacing by halcmd newthread\n");
+
     // determine module properties (loaded or not)
     retval = rtapi_get_tags(mod_name);
     if(retval == -1) {
@@ -1984,7 +1988,7 @@ static void print_vtable_info(char **patterns)
 {
     if (scriptmode == 0) {
 	halcmd_output("Exported vtables:\n");
-	halcmd_output("ID      Name                  Version Refcnt  Context Owner\n");
+	halcmd_output("ID      Name                             Version Refcnt  Context Owner\n");
     }
     rtapi_mutex_get(&(hal_data->mutex));
     int next = hal_data->vtable_list_ptr;
@@ -1999,7 +2003,7 @@ static void print_vtable_info(char **patterns)
 		halcmd_output("   %-5d", vt->context);
 	    hal_comp_t *comp = halpr_find_comp_by_id(vt->comp_id);
 	    if (comp) {
-                halcmd_output("   %-5d %-30.30s", comp->comp_id,  comp->name);
+                halcmd_output("   %-5d %-41.41s", comp->comp_id,  comp->name);
 	    } else {
                 halcmd_output("   * not owned by a component *");
 	    }
@@ -2022,7 +2026,7 @@ static void print_pin_info(int type, char **patterns)
 
     if (scriptmode == 0) {
 	halcmd_output("Component Pins:\n");
-	halcmd_output("  Comp   Inst Type  Dir         Value  Name                             Epsilon         Flags\n");
+	halcmd_output("  Comp   Inst Type  Dir         Value  Name                                             Epsilon         Flags\n");
     }
     rtapi_mutex_get(&(hal_data->mutex));
     next = hal_data->pin_list_ptr;
@@ -2046,7 +2050,7 @@ static void print_pin_info(int type, char **patterns)
 		    halcmd_output("%5d", pin->owner_id);
 
 		if (pin->type == HAL_FLOAT) {
-		    halcmd_output(" %5s %-3s  %9s  %-30.30s\t%f\t%d",
+		    halcmd_output(" %5s %-3s  %9s  %-41.41s\t%f\t%d",
 				  data_type((int) pin->type),
 				  pin_data_dir((int) pin->dir),
 				  data_value((int) pin->type, dptr),
@@ -2054,7 +2058,7 @@ static void print_pin_info(int type, char **patterns)
 				  hal_data->epsilon[pin->eps_index],
 				  pin->flags);
 		} else {
-		    halcmd_output(" %5s %-3s  %9s  %-30.30s\t\t\t%d",
+		    halcmd_output(" %5s %-3s  %9s  %-41.41s\t\t\t%d",
 				  data_type((int) pin->type),
 				  pin_data_dir((int) pin->dir),
 				  data_value((int) pin->type, dptr),
@@ -2062,7 +2066,7 @@ static void print_pin_info(int type, char **patterns)
 				  pin->flags);
 		}
 	    } else {
-		halcmd_output("%s %s %s %s %-30.30s",
+		halcmd_output("%s %s %s %s %-41.41s",
 			      comp->name,
 			      data_type((int) pin->type),
 			      pin_data_dir((int) pin->dir),
@@ -2280,7 +2284,10 @@ static void print_funct_info(char **patterns)
 
     if (scriptmode == 0) {
 	halcmd_output("Exported Functions:\n");
-	halcmd_output("  Comp   Inst CodeAddr  Arg       FP   Users Type    Name\n");
+	halcmd_output("  Comp   Inst CodeAddr         Arg              "
+		      "Users Type    "
+		      "Name                              "
+		      "Runtime    Maxtime\n");
     }
     rtapi_mutex_get(&(hal_data->mutex));
     next = hal_data->funct_list_ptr;
@@ -2295,15 +2302,23 @@ static void print_funct_info(char **patterns)
 		    halcmd_output("     ");
 		else
 		    halcmd_output("%5d", fptr->owner_id);
-		halcmd_output(" %08lx  %08lx  %-3s  %5d %-7s %s\n",
+		hal_s32_t runtime = 0;
+		if (fptr->runtime) {
+		    hal_s32_t* rt = SHMPTR((void *)fptr->runtime -
+					   comp->shmem_base);
+		    runtime = *rt;
+		}
+		halcmd_output(" %016lx %016lx %5d %-7s %-30.30s %10d %10d\n",
 
 			      (long)fptr->funct.l,
-			      (long)fptr->arg, (fptr->uses_fp ? "YES" : "NO"),
+			      (long)fptr->arg,
 			      fptr->users,
 			      ftype(fptr->type),
-			      fptr->name);
+			      fptr->name,
+			      runtime,
+			      fptr->maxtime);
 	    } else {
-		halcmd_output("%s %08lx %08lx %s %3d %s\n",
+		halcmd_output("%s %016lx %016lx %s %3d %s\n",
 		    comp->name,
 		    (long)fptr->funct.l,
 		    (long)fptr->arg, (fptr->uses_fp ? "YES" : "NO"),
@@ -2394,7 +2409,7 @@ static void print_thread_info(char **patterns)
 
     if (scriptmode == 0) {
 	halcmd_output("Realtime Threads (flavor: %s) :\n",  current_flavor->name);
-	halcmd_output("     Period  FP     Name               (     Time, Max-Time ) flags\n");
+	halcmd_output("     Period      Name               (     Time, Max-Time ) flags\n");
     }
     rtapi_mutex_get(&(hal_data->mutex));
     next_thread = hal_data->thread_list_ptr;
@@ -2402,14 +2417,15 @@ static void print_thread_info(char **patterns)
 	tptr = SHMPTR(next_thread);
 	if ( match(patterns, tptr->name) ) {
 		/* note that the scriptmode format string has no \n */
-		// TODO FIXME add thread runtime and max runtime to this print
 	    char flags[100];
 	    snprintf(flags, sizeof(flags),"%s%s",
 		     tptr->flags & TF_NONRT ? "posix ":"",
 		     tptr->flags & TF_NOWAIT ? "nowait":"");
 
-	    halcmd_output(((scriptmode == 0) ? "%11ld  %-3s  %20s ( %8ld, %8ld ) %s\n" : "%ld %s %s %ld %ld %s"),
-		tptr->period, (tptr->uses_fp ? "YES" : "NO"), tptr->name,
+	    halcmd_output(((scriptmode == 0) ? "%11ld %s%23s ( %8ld, %8ld ) %s\n" : "%ld %s %s %ld %ld %s"),
+			  tptr->period,
+			  (scriptmode == 0) ? "" : (tptr->uses_fp ? "YES" : "NO"),
+			  tptr->name,
 			  (long)tptr->runtime,
 			  (long)tptr->maxtime,  flags);
 
@@ -2423,7 +2439,7 @@ static void print_thread_info(char **patterns)
 		/* scriptmode only uses one line per thread, which contains:
 		   thread period, FP flag, name, then all functs separated by spaces  */
 		if (scriptmode == 0) {
-		    halcmd_output("                 %2d %s\n", n, funct->name);
+		    halcmd_output("              %2d %s\n", n, funct->name);
 		} else {
 		    halcmd_output(" %s", funct->name);
 		}
@@ -4083,10 +4099,12 @@ int do_newthread_cmd(char *name, char *args[])
 	if (sscanf(s, "cpu=%d", &cpu) == 1)
 	    continue;
 	if (strcmp(s, "fp") == 0) {
+	    halcmd_info("newthread: the 'fp' flag is deprecated and can be omitted\n");
 	    use_fp = true;
 	    continue;
 	}
 	if (strcmp(s, "nofp") == 0) {
+	    halcmd_info("newthread: the 'nofp' flag is deprecated and can be omitted\n");
 	    use_fp = false;
 	    continue;
 	}
@@ -4238,6 +4256,15 @@ int do_help_cmd(char *command)
     } else if (strcmp(command, "stype") == 0) {
 	printf("stype signame\n");
 	printf("  Gets the type of signal 'signame'\n");
+    } else if (strcmp(command, "newthread") == 0) {
+	printf("newthread name [options] period\n");
+	printf("  Creates a new realtime thread called 'name' which\n");
+	printf("  runs every 'period' nanoseconds.  Options are:\n");
+	printf("  cpu=N     assigns thread to CPU #N\n");
+	printf("  fp        (deprecated) thread supports floating point\n");
+	printf("  nofp      (deprecated) no floating point support (default)\n");
+	printf("  posix     (experimental) non-realtime thread\n");
+	printf("  nowait    (experimental) ignores period, for external sync\n");
     } else if (strcmp(command, "addf") == 0) {
 	printf("addf functname threadname [position]\n");
 	printf("  Adds function 'functname' to thread 'threadname'.  If\n");
@@ -4343,6 +4370,7 @@ static void print_help_commands(void)
     printf("  getp, gets          Get the value of a pin, parameter or signal\n");
     printf("  ptype, stype        Get the type of a pin, parameter or signal\n");
     printf("  setp, sets          Set the value of a pin, parameter or signal\n");
+    printf("  newthread           Creates a new realtime thread\n");
     printf("  addf, delf          Add/remove function to/from a thread\n");
     printf("  show                Display info about HAL objects\n");
     printf("  list                Display names of HAL objects\n");

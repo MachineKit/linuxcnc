@@ -924,6 +924,7 @@ ifeq ($(BUILD_EMCWEB),yes)
 endif
 	$(FILE) ../etc/linuxcnc/machinekit.ini $(DESTDIR)$(sysconfdir)/linuxcnc
 	$(EXE) ../bin/profile_axis $(DESTDIR)$(bindir)
+	$(EXE) ../bin/mank $(DESTDIR)$(bindir)
 
 ifeq ($(BUILD_PYTHON),yes)
 install-kernel-indep: install-python
@@ -1274,8 +1275,7 @@ endif
 
 ifdef TARGET_PLATFORM_SOCFPGA
 ifeq ($(BUILD_SYS),user-dso)
-obj-$(CONFIG_HM2_SOC) += hm2_soc.o hm2_soc_ol.o
-hm2_soc-objs := hal/drivers/mesa-hostmot2/hm2_soc.o
+obj-$(CONFIG_HM2_SOC_OL) += hm2_soc_ol.o
 hm2_soc_ol-objs := hal/drivers/mesa-hostmot2/hm2_soc_ol.o
 endif
 endif
@@ -1367,6 +1367,7 @@ hostmot2-objs +=			  \
     hal/drivers/mesa-hostmot2/watchdog.o  \
     hal/drivers/mesa-hostmot2/pins.o	  \
     hal/drivers/mesa-hostmot2/dpll.o  \
+    hal/drivers/mesa-hostmot2/irq.o  \
     hal/drivers/mesa-hostmot2/led.o	  \
     hal/drivers/mesa-hostmot2/fwid.o	  \
     hal/drivers/mesa-hostmot2/tram.o	  \
@@ -1691,7 +1692,6 @@ endif
 ifdef TARGET_PLATFORM_SOCFPGA
 ifeq ($(BUILD_SYS),user-dso)
 $(RTLIBDIR)/hostmot2$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(hostmot2-objs))
-$(RTLIBDIR)/hm2_soc$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(hm2_soc-objs))
 $(RTLIBDIR)/hm2_soc_ol$(MODULE_EXT): $(addprefix $(OBJDIR)/,$(hm2_soc_ol-objs))
 endif
 endif
