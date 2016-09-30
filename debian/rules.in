@@ -182,12 +182,12 @@ endif
 	cp src/rtapi/shmdrv/limits.d-machinekit.conf \
 	    debian/tmp/etc/security/limits.d/machinekit.conf
 
-	if (grep ^USERMODE_PCI=yes src/Makefile.inc -q); then \
-	    cp debian/machinekit-dev.install.in debian/machinekit-dev.install; \
-	else \
-	    grep -v userpci debian/machinekit-dev.install.in \
-		> debian/machinekit-dev.install; \
-	fi
+#	if (grep ^USERMODE_PCI=yes src/Makefile.inc -q); then \
+#	    cp debian/machinekit-dev.install.in debian/machinekit-dev.install; \
+#	else \
+#	    grep -v userpci debian/machinekit-dev.install.in \
+#		> debian/machinekit-dev.install; \
+#	fi
 
 	dh_install --sourcedir=debian/tmp --fail-missing -Xusr/bin/pasm
 
@@ -213,9 +213,9 @@ binary-arch: build install
 	dh_installdeb
 
 #	# delete files that should be in machinekit-dev package
-	rm -f debian/machinekit/usr/bin/comp
-	rm -f debian/machinekit/usr/share/linuxcnc/Makefile.modinc
-	rm -f debian/machinekit/usr/share/linuxcnc/Makefile.inc
+#	rm -f debian/machinekit/usr/bin/comp
+#	rm -f debian/machinekit/usr/share/linuxcnc/Makefile.modinc
+#	rm -f debian/machinekit/usr/share/linuxcnc/Makefile.inc
 
 	cat debian/machinekit/DEBIAN/shlibs debian/shlibs.pre > \
 	    debian/shlibs.local
