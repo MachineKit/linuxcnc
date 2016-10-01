@@ -182,13 +182,16 @@ endif
 	cp src/rtapi/shmdrv/limits.d-machinekit.conf \
 	    debian/tmp/etc/security/limits.d/machinekit.conf
 
-#	if (grep ^USERMODE_PCI=yes src/Makefile.inc -q); then \
-#	    cp debian/machinekit-dev.install.in debian/machinekit-dev.install; \
-#	else \
-#	    grep -v userpci debian/machinekit-dev.install.in \
-#		> debian/machinekit-dev.install; \
-#	fi
+	cp debian/machinekit-posix.install.in debian/machinekit-posix.install
+	cp debian/machinekit-rt-preempt.install.in debian/machinekit-rt-preempt.install
+	cp debian/machinekit-xenomai.install.in debian/machinekit-xenomai.install
 
+	if (grep ^USERMODE_PCI=yes src/Makefile.inc -q); then \
+	    echo "usr/include/linuxcnc/userpci/*.h" >> debian/machinekit-posix.install; \
+	    echo "usr/include/linuxcnc/userpci/*.h" >> debian/machinekit-rt-preempt.install; \
+	    echo "usr/include/linuxcnc/userpci/*.h" >> debian/machinekit-xenomai.install; \
+	fi
+	
 	dh_install --sourcedir=debian/tmp --fail-missing -Xusr/bin/pasm
 
 # Build architecture-independent files here.
