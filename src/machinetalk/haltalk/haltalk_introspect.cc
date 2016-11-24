@@ -53,15 +53,18 @@ describe_group(htself_t *self, const char *group, const std::string &from,  void
 {
     int retval __attribute__((cleanup(halpr_autorelease_mutex)));
     rtapi_mutex_get(&(hal_data->mutex));
+    zmsg_t *from_msg = zmsg_new();
+    zmsg_pushstr(from_msg, from.c_str());
 
     hal_group_t *g = halpr_find_group_by_name(group);
     if (g == NULL) {
 	self->tx.set_type(pb::MT_HALRCOMP_ERROR);
+
 	note_printf(self->tx, "no such group: '%s'", group);
-	return send_pbcontainer(from, self->tx, socket);
+	return send_pbcontainer(from_msg, self->tx, socket);
     }
     halpr_foreach_group(group, describe_group_cb, self);
-    return send_pbcontainer(from, self->tx, socket);
+    return send_pbcontainer(from_msg, self->tx, socket);
 }
 
 // describe a HAL component as a protobuf message.
@@ -70,15 +73,17 @@ describe_comp(htself_t *self, const char *comp, const std::string &from,  void *
 {
     int retval __attribute__((cleanup(halpr_autorelease_mutex)));
     rtapi_mutex_get(&(hal_data->mutex));
+    zmsg_t *from_msg = zmsg_new();
+    zmsg_pushstr(from_msg, from.c_str());
 
     hal_comp_t *c = halpr_find_comp_by_name(comp);
     if (c == NULL) {
 	self->tx.set_type(pb::MT_HALRCOMP_ERROR);
 	note_printf(self->tx, "no such component: '%s'", comp);
-	return send_pbcontainer(from, self->tx, socket);
+	return send_pbcontainer(from_msg, self->tx, socket);
     }
     halpr_foreach_comp(comp, describe_comp_cb, self);
-    return send_pbcontainer(from, self->tx, socket);
+    return send_pbcontainer(from_msg, self->tx, socket);
 }
 
 // add protocol parameters the subscriber might want to know about

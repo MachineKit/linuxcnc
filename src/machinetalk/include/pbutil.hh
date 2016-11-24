@@ -29,7 +29,6 @@ typedef ::google::protobuf::RepeatedPtrField< ::std::string> pbstringarray_t;
 // send a protobuf - encoded Container message
 // optionally prepend destination field
 // log any failure to RTAPI
-int send_pbcontainer(const std::string &dest, pb::Container &c, void *socket);
 int send_pbcontainer(zmsg_t *dest, pb::Container &c, void *socket);
 
 // add an printf-formatted string to the 'note' repeated string in a

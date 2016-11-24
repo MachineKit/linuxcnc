@@ -93,8 +93,10 @@ int halpr_describe_funct(hal_funct_t *funct, pb::Function *pbfunct)
     pbfunct->set_name(funct->name);
     pbfunct->set_handle(funct->handle);
     pbfunct->set_users(funct->users);
-    pbfunct->set_runtime(*(funct->runtime));
-    pbfunct->set_maxtime(funct->maxtime);
+    if (funct->runtime)
+	pbfunct->set_runtime(*(funct->runtime));
+    if (funct->maxtime)
+	pbfunct->set_maxtime(funct->maxtime);
     pbfunct->set_reentrant(funct->reentrant);
     return 0;
 }
