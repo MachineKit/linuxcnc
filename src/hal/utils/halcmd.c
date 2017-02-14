@@ -216,7 +216,7 @@ struct halcmd_command halcmd_commands[] = {
     {"sweep",   FUNCT(do_sweep_cmd),   A_ONE | A_OPTIONAL },
     {"shutdown",FUNCT(do_shutdown_cmd), A_ZERO },
     {"sleep",   FUNCT(do_sleep_cmd),  A_ONE },
-    {"source",  FUNCT(do_source_cmd),  A_ONE | A_TILDE },
+    {"source",  FUNCT(do_source_cmd),  A_ONE | A_TILDE | A_PLUS},
     {"start",   FUNCT(do_start_cmd),   A_ZERO},
     {"status",  FUNCT(do_status_cmd),  A_ONE | A_OPTIONAL },
     {"stop",    FUNCT(do_stop_cmd),    A_ZERO},
