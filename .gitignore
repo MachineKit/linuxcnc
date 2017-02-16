@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 autosave.halscope
 build-stamp
 *.pyc
@@ -68,3 +69,9 @@ src/hal/cython/machinekit/*.c
 /machinekit-build-deps_*.deb
 .directory
 *.9icomp
+=======
+build
+node_modules
+objects
+generated
+>>>>>>> a99ba21... Squashed 'src/machinetalk/proto/' content from commit 211433b
