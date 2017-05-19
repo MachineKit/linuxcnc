@@ -202,6 +202,7 @@ SUBDIRS := \
 	machinetalk/msgcomponents \
 	machinetalk/lib \
 	machinetalk/config-service \
+	machinetalk/webtalk \
 	machinetalk/haltalk \
 	machinetalk/mkwrapper \
 	machinetalk/mklauncher \
@@ -271,10 +272,6 @@ SUBDIRS := \
 
 ifeq ($(HAVE_KERNEL_THREADS),yes)
 SUBDIRS += module_helper
-endif
-
-ifeq ($(BUILD_WEBTALK),yes)
-SUBDIRS += machinetalk/webtalk
 endif
 
 # moved to src/rtapi/Submakefile
