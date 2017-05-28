@@ -158,7 +158,8 @@ fail0:
 EXPORT_SYMBOL_GPL(hm2_pktuart_setup);
 // use -1 for tx_mode and rx_mode to leave the mode unchanged
 // use 1 for txclear or rxclear to issue a clear command for Tx or Rx registers
-int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int txclear, int rxclear){
+// use -1 for filter_reg to calculate a standard filter value or for backwards compatibilty
+int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int filter_reg, int txclear, int rxclear){
     hostmot2_t *hm2;
     hm2_pktuart_instance_t *inst = 0;
     u32 buff;
@@ -212,6 +213,8 @@ int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int txc
     /* http://freeby.mesanet.com/regmap
       The PktUARTrMode register is used for setting and checking the PktUARTr's 
       operation mode, timing, and status
+      Bit  31..30      Unused
+      Bit  29..22      Filter Register
       Bit  21          FrameBuffer has data 
       Bits 20..16      Frames received
       Bits 15..8       InterFrame delay in bit times
@@ -224,8 +227,14 @@ int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int txc
       Bit  1           Overrun error (no stop bit when expected) (sticky)
       Bit  0           False Start bit error (sticky)
     */
-    if (rx_mode >= 0) {
-        buff = ((u32)rx_mode) & 0xffff;
+    if (rx_mode >= 0)  {
+        // if filter_reg==-1, we calculate the FilterReg value as floor( (0.5*BitTime*ClockLow - 1) )
+        if (filter_reg==-1) {
+            filter_reg = rtapi_floor(0.5*inst->clock_freq/inst->bitrate - 1.0);
+            if (filter_reg > 255)
+                filter_reg = 255;
+        }
+        buff = ( ((u32)rx_mode) & 0xffff ) | (( ((u32)filter_reg) & 0xff ) << 22) ; 
         r += hm2->llio->write(hm2->llio, inst->rx_mode_addr, &buff, sizeof(u32));
     }
 

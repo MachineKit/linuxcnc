@@ -148,6 +148,8 @@ EXTRA_SETUP(){ // the names parameters are passed in 'prefix'. You just have to 
 	 /* http://freeby.mesanet.com/regmap
 	  The PktUARTrMode register is used for setting and checking the PktUARTr's
 	  operation mode, timing, and status
+      Bit  31..30      Unused
+      Bit  29..22      Filter Register
 	  Bit  21	       FrameBuffer has data
 	  Bits 20..16      Frames received
 	  Bits 15..8       InterFrame delay in bit times
@@ -168,7 +170,7 @@ EXTRA_SETUP(){ // the names parameters are passed in 'prefix'. You just have to 
 	   Then we read out whatever is in the buffer, send the DISABLE STREAM
 	   datagram and only then set RXEnable bit.
 	*/
-	int retval=hm2_pktuart_setup(name, BAUDRATE , 0x0ff20,  0x007f00,1,1);
+	int retval=hm2_pktuart_setup(name, BAUDRATE , 0x0ff20,  0x007f00, -1, 1, 1);
 	if (retval<0)
 	{
 	    rtapi_print_msg(1, "PktUART for gyro setup problem: %d\n", retval);
@@ -228,7 +230,7 @@ EXTRA_SETUP(){ // the names parameters are passed in 'prefix'. You just have to 
 	}
 
 	// Now we set RxEnable bit and clear Rx/Tx registers
-	retval=hm2_pktuart_setup(name, BAUDRATE , 0x0ff20,  0x007f08,1,1);
+	retval=hm2_pktuart_setup(name, BAUDRATE , 0x0ff20,  0x007f08, -1, 1, 1);
 	if (retval<0)
 	{
 	 rtapi_print_msg(1, "PktUART for gyro setup problem: %d\n", retval);
