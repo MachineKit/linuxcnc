@@ -1401,7 +1401,7 @@ void hm2_pktuart_write(hostmot2_t *hm2);
 void hm2_pktuart_force_write(hostmot2_t *hm2); // ??
 void hm2_pktuart_prepare_tram_write(hostmot2_t *hm2, long period); //??
 void hm2_pktuart_process_tram_read(hostmot2_t *hm2, long period);  //  ??
-int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int txclear, int rxclear);
+int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int filter_reg, int txclear, int rxclear);
 int hm2_pktuart_send(char *name,  unsigned char data[], u8 *num_frames, u16 frame_sizes[]);
 int hm2_pktuart_read(char *name, unsigned char data[],  u8 *num_frames, u16 *max_frame_length, u16 frame_sizes[]);
 
