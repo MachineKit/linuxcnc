@@ -229,9 +229,12 @@ int hm2_pktuart_setup(char *name, int bitrate, s32 tx_mode, s32 rx_mode, int fil
     */
     if (rx_mode >= 0)  {
         // if filter_reg==-1, we calculate the FilterReg value as floor( (0.5*BitTime*ClockLow - 1) )
-        if (filter_reg==-1)
+        if (filter_reg==-1) {
             filter_reg = rtapi_floor(0.5*inst->clock_freq/inst->bitrate - 1.0);
-        buff = ( ((u32)rx_mode) & 0xffff ) | ((filter_reg & 0xff) << 22) ; // =0011 1111 1100 0000 1111 1111 1111 1111
+            if (filter_reg > 255)
+                filter_reg = 255;
+        }
+        buff = ( ((u32)rx_mode) & 0xffff ) | (( ((u32)filter_reg) & 0xff ) << 22) ; 
         r += hm2->llio->write(hm2->llio, inst->rx_mode_addr, &buff, sizeof(u32));
     }
 
