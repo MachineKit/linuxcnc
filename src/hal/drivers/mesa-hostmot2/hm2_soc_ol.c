@@ -318,11 +318,11 @@ static int hm2_soc_mmap(hm2_soc_t *brd) {
     hm2_lowlevel_io_t *this = &brd->llio;
 
     // we can mmap this device safely only if programmed so cop out
-    if (brd->fpga_state != DTOV_STAT_APPLIED) {
-        LL_ERR("invalid fpga state %d, unsafe to mmap %s",
-            brd->fpga_state, brd->uio_dev);
-        return -EIO;
-    }
+//     if (brd->fpga_state != DTOV_STAT_APPLIED) {
+//         LL_ERR("invalid fpga state %d, unsafe to mmap %s",
+//             brd->fpga_state, brd->uio_dev);
+//         return -EIO;
+//     }
 
     // Fix race from overlay framework
     // spin to give uio device time to appear with proper permissions
