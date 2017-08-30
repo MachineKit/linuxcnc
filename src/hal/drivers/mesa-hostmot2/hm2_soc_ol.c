@@ -580,13 +580,13 @@ static int instantiate(const int argc, const char**argv)
         LL_DBG("custom descriptor '%s' size %zu", brd->descriptor, nread);
     }
 
-    r = hm2_soc_register(brd, blob, nread, inst_id);
-    if (blob)
-        free(blob);
-    if (r != 0) {
-        LL_ERR("error registering UIO driver: %i\n",r);
-        return -1;
-    }
+//     r = hm2_soc_register(brd, blob, nread, inst_id);
+//     if (blob)
+//         free(blob);
+//     if (r != 0) {
+//         LL_ERR("error registering UIO driver: %i\n",r);
+//         return -1;
+//     }
     return 0;
 }
 
