@@ -318,11 +318,11 @@ static int hm2_soc_mmap(hm2_soc_t *brd) {
     hm2_lowlevel_io_t *this = &brd->llio;
 
     // we can mmap this device safely only if programmed so cop out
-    if (brd->fpga_state != DTOV_STAT_APPLIED) {
-        LL_ERR("invalid fpga state %d, unsafe to mmap %s",
-            brd->fpga_state, brd->uio_dev);
-        return -EIO;
-    }
+//     if (brd->fpga_state != DTOV_STAT_APPLIED) {
+//         LL_ERR("invalid fpga state %d, unsafe to mmap %s",
+//             brd->fpga_state, brd->uio_dev);
+//         return -EIO;
+//     }
 
     // Fix race from overlay framework
     // spin to give uio device time to appear with proper permissions
@@ -580,13 +580,13 @@ static int instantiate(const int argc, const char**argv)
         LL_DBG("custom descriptor '%s' size %zu", brd->descriptor, nread);
     }
 
-    r = hm2_soc_register(brd, blob, nread, inst_id);
-    if (blob)
-        free(blob);
-    if (r != 0) {
-        LL_ERR("error registering UIO driver: %i\n",r);
-        return -1;
-    }
+//     r = hm2_soc_register(brd, blob, nread, inst_id);
+//     if (blob)
+//         free(blob);
+//     if (r != 0) {
+//         LL_ERR("error registering UIO driver: %i\n",r);
+//         return -1;
+//     }
     return 0;
 }
 
