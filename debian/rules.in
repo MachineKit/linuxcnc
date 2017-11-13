@@ -193,6 +193,21 @@ endif
 	    echo "usr/include/linuxcnc/userpci/*.h" >> debian/machinekit-xenomai.install; \
 	fi
 
+	## only want this for armhf builds ##
+	if [ -f debian/platform_pc ] ; then \
+	    rm -f debian/platform_pc; \
+	else \
+	    mkdir -p debian/tmp/usr/lib/linuxcnc/prubin; \
+	    cp rtlib/prubin/* debian/tmp/usr/lib/linuxcnc/prubin; \
+	    cat debian/posix-postinst.add >> debian/machinekit-posix.postinst; \
+	    cat debian/rt-preempt-postinst.add >> debian/machinekit-rt-preempt.postinst; \
+	    cat debian/xenomai-postinst.add >> debian/machinekit-xenomai.postinst; \
+	    echo "usr/lib/linuxcnc/prubin/*" >> debian/machinekit-posix.install; \
+	    echo "usr/lib/linuxcnc/prubin/*" >> debian/machinekit-rt-preempt.install; \
+	    echo "usr/lib/linuxcnc/prubin/*" >> debian/machinekit-xenomai.install; \
+	fi
+
+
 	dh_install --sourcedir=debian/tmp --fail-missing -Xusr/bin/pasm
 
 # Build architecture-independent files here.
@@ -212,7 +227,7 @@ binary-arch: build install
 	dh_compress -X.pdf -X.txt -X.hal -X.ini -X.clp -X.var -X.nml \
 	    -X.tbl -X.xml -Xsample-configs
 	dh_fixperms -X/linuxcnc_module_helper -X/rtapi_app_
-	dh_python2 --ignore-shebangs --no-guessing-versions
+	dh_python2 --ignore-shebangs --no-guessing-versions --no-ext-rename
 	dh_makeshlibs
 	dh_installdeb
 
@@ -223,11 +238,9 @@ binary-arch: build install
 
 	cat debian/machinekit/DEBIAN/shlibs debian/shlibs.pre > \
 	    debian/shlibs.local
-	## ignore missing deps / symbols info for locally built libs
-	## necessary for Stretch builds until packaged libs can be used for czmq and zeromq
-	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info -l debian/machinekit/usr/lib
-	#dh_shlibdeps -l debian/machinekit/usr/lib
+	dh_shlibdeps -l debian/machinekit/usr/lib
 	dh_gencontrol
+	
 	dh_md5sums
 	dh_builddeb
 
