@@ -1,0 +1,2 @@
+OpenBeam KosselPro with a CRAMPS controller board and DRV8825 stepper drivers.
+
