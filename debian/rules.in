@@ -189,15 +189,18 @@ endif
 	    echo "usr/include/linuxcnc/userpci/*.h" >> debian/machinekit-xenomai.install; \
 	fi
 
-	## only want this for armhf builds ##
+	## only want prubin for armhf builds ##
 	if [ -f debian/platform_pc ] ; then \
+	    cat debian/posix-postinst-pc.add >> debian/machinekit-posix.postinst; \
+	    cat debian/rt-preempt-postinst-pc.add >> debian/machinekit-rt-preempt.postinst; \
+	    cat debian/xenomai-postinst-pc.add >> debian/machinekit-xenomai.postinst; \
 	    rm -f debian/platform_pc; \
 	else \
 	    mkdir -p debian/tmp/usr/lib/linuxcnc/prubin; \
 	    cp rtlib/prubin/* debian/tmp/usr/lib/linuxcnc/prubin; \
-	    cat debian/posix-postinst.add >> debian/machinekit-posix.postinst; \
-	    cat debian/rt-preempt-postinst.add >> debian/machinekit-rt-preempt.postinst; \
-	    cat debian/xenomai-postinst.add >> debian/machinekit-xenomai.postinst; \
+	    cat debian/posix-postinst-arm.add >> debian/machinekit-posix.postinst; \
+	    cat debian/rt-preempt-postinst-arm.add >> debian/machinekit-rt-preempt.postinst; \
+	    cat debian/xenomai-postinst-arm.add >> debian/machinekit-xenomai.postinst; \
 	    echo "usr/lib/linuxcnc/prubin/*" >> debian/machinekit-posix.install; \
 	    echo "usr/lib/linuxcnc/prubin/*" >> debian/machinekit-rt-preempt.install; \
 	    echo "usr/lib/linuxcnc/prubin/*" >> debian/machinekit-xenomai.install; \
