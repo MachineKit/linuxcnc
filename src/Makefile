@@ -1072,12 +1072,9 @@ endif
 
 	# install userland flavor .so modules into
 	# /usr/lib/linuxcnc/modules
-	echo Installing modules for all userland flavors; \
-	$(DIR) $(DESTDIR)$(EMC2_RTLIB_BASE_DIR)/modules; \
-	$(FILE) ../rtlib/modules/* \
-	$(DESTDIR)$(EMC2_RTLIB_BASE_DIR)/modules;
-
-
+	echo Installing modules for all userland flavors; 
+	$(DIR) $(DESTDIR)/usr/lib/linuxcnc/modules ; 
+	$(FILE) ../rtlib/modules/*.so $(DESTDIR)/usr/lib/linuxcnc/modules ;
 
 #for flavor in $(BUILD_THREAD_FLAVORS); do \
 #	if test $${flavor%-kernel} = $${flavor}; then \
