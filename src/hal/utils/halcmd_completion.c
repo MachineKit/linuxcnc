@@ -572,7 +572,7 @@ static char *loadrt_generator(const char *text, int state) {
     return NULL;
 
     strcat(rtlibdir,"/");
-    strcat(rtlibdir, current_flavor->name);
+    strcat(rtlibdir, "modules");
     strcat(rtlibdir,"/");
 
     if(!state) {

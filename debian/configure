@@ -130,11 +130,14 @@ BUILD_DEPS=  # List of Build-Depends
 HAVE_FLAVOR=false
 
 # copy base templates into place
-## need python-gst0.10 for Jessie, none for Stretch, no python-gtksourceview2 for Buster
+## need python-gst0.10 for Jessie, none for Stretch,  
+## no python-gtksourceview2 for Buster and python-gst-1.0, python-pil and python-pil.imagegtk for SID
 if [ "$DISTRO_CODENAME" == "stretch" ]; then
     cp control.stretch.in control
 elif [ "$DISTRO_CODENAME" == "buster" ]; then
     cp control.buster.in control   	
+elif [ "$DISTRO_CODENAME" == "sid" ]; then
+    cp control.sid.in control   	
 else
     cp control.in control
 fi
