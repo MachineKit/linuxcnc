@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 import os
 import sys
@@ -12,6 +12,9 @@ import argparse
 import ConfigParser
 from machinekit import service
 from machinekit import config
+
+
+MJPG_STREAMER_PLUGIN_PATH = '/usr/local/lib/mjpg-streamer/'
 
 
 class VideoDevice:
@@ -90,7 +93,7 @@ class VideoServer(threading.Thread):
                 "dsname = ", videoDevice.dsname,
                 "port =", videoDevice.port))
 
-        libpath = '/usr/local/lib/'
+        libpath = MJPG_STREAMER_PLUGIN_PATH
         os.environ['LD_LIBRARY_PATH'] = libpath
 
         arguments = ""
