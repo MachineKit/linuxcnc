@@ -191,9 +191,10 @@ class RTAPIcommand:
         if r:
             raise RuntimeError("cant connect to rtapi: %s" % strerror(-r))
 
-    def newthread(self,char *name, int period, instance=0,fp=0,cpu=-1, flags=0):
+    def newthread(self,char *name, int period, instance=0, fp=0, cpu=-1,
+                  char *cgname=None, flags=0):
         cdef char *c_name = name
-        r = rtapi_newthread(instance, c_name, period, cpu, fp, flags)
+        r = rtapi_newthread(instance, c_name, period, cpu, cgname, fp, flags)
         if r:
             raise RuntimeError("rtapi_newthread failed:  %s" % strerror(-r))
 
