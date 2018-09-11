@@ -25,7 +25,8 @@ and real-time environments, and delivers excellent performance at
 low cost. It is based on the HAL component architecture, an intuitive
 and easy to use circuit model that includes over 150 building blocks
 for digital logic, motion, control loops, signal processing, and hardware
-drivers. Machinekit supports local and networked UI options, including 
+drivers. 
+Machinekit supports local and networked UI options, including 
 ubiquitous platforms like phones or tablets.
 
 == Getting Machinekit
