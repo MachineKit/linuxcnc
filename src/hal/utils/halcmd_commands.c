@@ -1975,58 +1975,58 @@ static int print_comp_entry(hal_object_ptr o, foreach_args_t *args)
 
     if (match(args->user_ptr1, ho_name(comp))) {
 
-	halcmd_output(" %5d  %-4s %c%c%c%c  %4d %-*s",
-		      ho_id(comp),
-		      type_name(comp),
-		      has_ctor ? 'c': ' ',
-		      has_dtor ? 'd': ' ',
-		      is_hallib ? 'i': ' ',
-		      ' ',
-		      inst_count(0, comp),
-		      HAL_NAME_LEN,
-		      ho_name(comp));
+        halcmd_output(" %5d  %-4s %c%c%c%c  %4d %-*s",
+                      ho_id(comp),
+                      type_name(comp),
+                      has_ctor ? 'c': ' ',
+                      has_dtor ? 'd': ' ',
+                      is_hallib ? 'i': ' ',
+                      ' ',
+                      inst_count(0, comp),
+                      HAL_NAME_LEN,
+                      ho_name(comp));
 
-	switch (comp->type) {
-	case TYPE_USER:
-	case TYPE_HALLIB:
+        switch (comp->type) {
+            case TYPE_USER:
+            case TYPE_HALLIB:
 
-	    halcmd_output(" %-5d %s", comp->pid,
-			  state_name(comp->state));
-	    break;
+                halcmd_output(" %-5d %s", comp->pid,
+                              state_name(comp->state));
+                break;
 
-	case TYPE_RT:
-	    halcmd_output(" RT    %s",
-			  state_name(comp->state));
-	    break;
+            case TYPE_RT:
+                halcmd_output(" RT    %s",
+                              state_name(comp->state));
+                break;
 
-	case TYPE_REMOTE:
-	    halcmd_output(" %-5d %s", comp->pid,
-			  state_name(comp->state));
-	    time_t now = time(NULL);
-	    if (comp->last_update) {
+            case TYPE_REMOTE:
+                halcmd_output(" %-5d %s", comp->pid,
+                              state_name(comp->state));
+                time_t now = time(NULL);
+                if (comp->last_update) {
 
-		halcmd_output(", update:-%ld",-(comp->last_update-now));
-	    } else
-		halcmd_output(", update:never");
+                    halcmd_output(", update:-%ld",-(comp->last_update-now));
+                } else
+                    halcmd_output(", update:never");
 
-	    if (comp->last_bound) {
+                if (comp->last_bound) {
 
-		halcmd_output(", bound:%lds",comp->last_bound-now);
-	    } else
-		halcmd_output(", bound:never");
-	    if (comp->last_unbound) {
-		time_t now = time(NULL);
+                    halcmd_output(", bound:%lds",comp->last_bound-now);
+                } else
+                    halcmd_output(", bound:never");
+                if (comp->last_unbound) {
+                    time_t now = time(NULL);
 
-		halcmd_output(", unbound:%lds", comp->last_unbound-now);
-	    } else
-		halcmd_output(", unbound:never");
-		halcmd_output(", u1:%d u2:%d", comp->userarg1, comp->userarg2);
-	    break;
-	default:
-	    halcmd_output(" %-5s %s", "", state_name(comp->state));
-	}
-	halcmd_output(", u1:%d u2:%d", comp->userarg1, comp->userarg2);
-	halcmd_output("\n");
+                    halcmd_output(", unbound:%lds", comp->last_unbound-now);
+                } else
+                    halcmd_output(", unbound:never");
+                halcmd_output(", u1:%d u2:%d", comp->userarg1, comp->userarg2);
+                break;
+            default:
+                halcmd_output(" %-5s %s", "", state_name(comp->state));
+        }
+        halcmd_output(", u1:%d u2:%d", comp->userarg1, comp->userarg2);
+        halcmd_output("\n");
     }
     return 0;
 }
@@ -4393,6 +4393,7 @@ int do_newthread_cmd(char *name, char *args[])
     int i, retval;
     bool use_fp = false;
     int cpu = -1;
+    char cgname[LINELEN] = {0};
     char *s;
     int per = 1000000;
     int flags = 0;
@@ -4416,6 +4417,8 @@ int do_newthread_cmd(char *name, char *args[])
 	    flags |= TF_NOWAIT;
 	    continue;
 	}
+	if (sscanf(s, "cgname=%s", cgname) == 1)
+		continue;
 	char *cp = s;
 	per = strtol(s, &cp, 0);
 	if ((*cp != '\0') && (!isspace(*cp))) {
@@ -4430,7 +4433,8 @@ int do_newthread_cmd(char *name, char *args[])
 	halcmd_info("specifying 'nowait' without 'posix' makes it easy to lock up RT\n");
     }
 
-    retval = rtapi_newthread(rtapi_instance, name, per, cpu, (int)use_fp, flags);
+    retval = rtapi_newthread(rtapi_instance, name, per, cpu, cgname,
+                             (int)use_fp, flags);
     if (retval)
 	halcmd_error("rc=%d: %s\n",retval,rtapi_rpcerror());
 
@@ -4672,4 +4676,3 @@ static void print_help_commands(void)
     printf("  echo, unecho        Echo commands from stdin to stderr\n");
     printf("  quit, exit          Exit from halcmd\n");
 }
-
