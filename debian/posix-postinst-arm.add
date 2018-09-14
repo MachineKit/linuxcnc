@@ -1,4 +1,7 @@
 
+# make symlink to modules dir
+ln -sf /usr/lib/linuxcnc/modules /usr/lib/linuxcnc/posix
+
 # ensure the links do not pre-exist, from previous installs.
 # or user work-arounds,  which will produce error messages
 rm -f /usr/lib/linuxcnc/posix/pru_generic.bin

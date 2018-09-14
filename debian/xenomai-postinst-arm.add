@@ -1,4 +1,7 @@
 
+# make symlink to modules dir
+ln -sf /usr/lib/linuxcnc/modules /usr/lib/linuxcnc/xenomai
+
 # ensure the links do not pre-exist, from previous installs.
 # or user work-arounds,  which will produce error messages
 rm -f /usr/lib/linuxcnc/xenomai/pru_generic.bin
