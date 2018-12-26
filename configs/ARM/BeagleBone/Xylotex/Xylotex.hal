@@ -40,7 +40,8 @@ loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[TRAJ]AX
 # load low-level drivers
 loadrt hal_bb_gpio output_pins=807,811,812,813,815,816,819,826,914,915,923,913,911 input_pins=809,810,814,818
 
-loadrt [PRUCONF](DRIVER) prucode=$(LINUXCNC_HOME)/[PRUCONF](PRUBIN) [PRUCONF](CONFIG) halname=hpg pru_period=25000
+#loadrt [PRUCONF](DRIVER) prucode=$(HAL_RTMOD_DIR)/[PRUCONF](PRUBIN) [PRUCONF](CONFIG) halname=hpg
+loadrt [PRUCONF](DRIVER) prucode=$(HAL_RTMOD_DIR)/[PRUCONF](PRUBIN) [PRUCONF](CONFIG) halname=hpg pru_period=25000
 loadrt pid count=4
 loadrt limit1 count=2
 
@@ -114,7 +115,11 @@ setp pid.0.deadband [AXIS_0]DEADBAND
 setp pid.0.maxoutput [AXIS_0]MAX_OUTPUT
 
 # Add X home switch input on DB25-11
-net home-x bb_gpio.p8.in-10 => axis.0.home-sw-in
+#net home-x bb_gpio.p8.in-10 => axis.0.home-sw-in
+net both-home-x <= bb_gpio.p8.in-10
+net both-home-x => axis.0.home-sw-in
+net both-home-x => axis.0.neg-lim-sw-in
+net both-home-x => axis.0.pos-lim-sw-in
 #setp bb_gpio.p8.in-10.invert 1
 
 # ################
@@ -165,7 +170,11 @@ setp pid.1.deadband [AXIS_1]DEADBAND
 setp pid.1.maxoutput [AXIS_1]MAX_OUTPUT
 
 # Add Y home switch input on DB25-12
-net home-y bb_gpio.p8.in-14 => axis.1.home-sw-in
+#net home-y bb_gpio.p8.in-14 => axis.1.home-sw-in
+net both-home-y <= bb_gpio.p8.in-14
+net both-home-y => axis.1.home-sw-in
+net both-home-y => axis.1.neg-lim-sw-in
+net both-home-y => axis.1.pos-lim-sw-in
 
 # ################
 # Z [2] Axis
@@ -215,7 +224,11 @@ setp pid.2.deadband [AXIS_2]DEADBAND
 setp pid.2.maxoutput [AXIS_2]MAX_OUTPUT
 
 # Add Z home switch input on DB25-13
-net home-z bb_gpio.p8.in-18 => axis.2.home-sw-in
+#net home-z bb_gpio.p8.in-18 => axis.2.home-sw-in
+net both-home-z <= bb_gpio.p8.in-18
+net both-home-z => axis.2.home-sw-in
+net both-home-z => axis.2.neg-lim-sw-in
+net both-home-z => axis.2.pos-lim-sw-in
 
 # ################
 # A [3] Axis

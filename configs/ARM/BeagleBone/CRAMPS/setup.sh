@@ -108,15 +108,15 @@ sudo $(which config-pin) -f - <<- EOF
 #	P9.25	low	# LED
 	P9.26	low	# E2 Dir
 	P9.27	low	# FET 3 : E2
-	P9.28	low	# SPI CS0
-	P9.29	low	# SPI MISO
-	P9.30	low	# SPI MOSI
-	P9.31	low	# SPI SCLK
+#	P9.28	low	# SPI CS0
+#	P9.29	low	# SPI MISO
+#	P9.30	low	# SPI MOSI
+#	P9.31	low	# SPI SCLK
 
 	P9.41	low	# FET 5
-	P9.91	in	# Reserved, connected to P9.41
+#	P9.91	in	# Reserved, connected to P9.41
 
 #	P9.42	low	# SPI CS1
-	P9.92	in	# Reserved, connected to P9.42
+#	P9.92	in	# Reserved, connected to P9.42
 EOF
 
