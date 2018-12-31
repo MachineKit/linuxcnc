@@ -23,7 +23,7 @@
 # Launch the setup script to make sure hardware setup looks good
 #loadusr -w /home/machinekit/machinekit/configs/ARM.BeagleBone.Xylotex/setup.sh
 loadusr -w ./setup.sh
-#loadusr -w config-pin -f ./Xylotex.bbio
+loadusr -w config-pin -f ./Xylotex.bbio
 
 # ###################################
 # Core EMC/HAL Loads
@@ -37,8 +37,8 @@ loadrt tp
 # motion controller, get name and thread periods from ini file
 loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[TRAJ]AXES  tp=tp kins=trivkins
 
-# load low-level drivers
-loadrt hal_bb_gpio output_pins=807,811,812,813,815,816,819,826,914,915,923,913,911 input_pins=809,810,814,818
+# load low-level drivers (must not include pins used by PRU)
+loadrt hal_bb_gpio output_pins=807,813,819,826,914,913,911 input_pins=809,810,814,818
 
 loadrt [PRUCONF](DRIVER) prucode=$(HAL_RTMOD_DIR)/[PRUCONF](PRUBIN) [PRUCONF](CONFIG) halname=hpg pru_period=25000
 loadrt pid count=4
