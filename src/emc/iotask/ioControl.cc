@@ -50,6 +50,7 @@
 *  iocontrol.numtools to number of tools on ATC (default is 6)
 *  iocontrol.currenttool to current tool number
 *  iocontrol.update to 1 will start the sequence
+*  iocontrol.initialised to 1 will set automatically the actual tool from ATC at startup
 *
 *  iocontrol will issue a toolchange for that tool number, which will not
 *  result in movement because it is already there, but will update system
@@ -672,8 +673,10 @@ int read_hal_inputs(void)
       // NEW CODE
       // this triggers a status update, which is the easiest way to force an tool update
       // without injecting messages directly into the system
-      
-   if( ((*(iocontrol_data->currenttool)) != (*(iocontrol_data->tool_number))) && *(iocontrol_data->update) == 1) 
+      // 0 is a valid number for reset toolstate after ATC failure for keep Gcode execution
+      // after ATC failiure call another Gcode with same tool_number as memory Axis don't know ATC need to home again
+
+   if( (((*(iocontrol_data->currenttool)) != (*(iocontrol_data->tool_number))) || *(iocontrol_data->currenttool) == 0) && *(iocontrol_data->update) == 1)
         retval = 1;
   
     return retval;
@@ -929,9 +932,9 @@ int main(int argc, char *argv[])
 // When io receives this it sets the appropriate NML code and axis updates the tool loaded display	
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	if(*(iocontrol_data->initialised) == 0) // only do this once
+	if(*(iocontrol_data->update) == 1 || *(iocontrol_data->initialised) == 0) // only do this once at startup or by call update
     	    {
-	    if((*(iocontrol_data->currenttool) > 0) && (*(iocontrol_data->currenttool) < *(iocontrol_data->numtools))) 
+	    if((*(iocontrol_data->currenttool) >= 0) && (*(iocontrol_data->currenttool) < *(iocontrol_data->numtools)))
 		{ // if it contains a valid number
 		*(iocontrol_data->tool_prepare) = 1;
 		*(iocontrol_data->tool_prep_pocket) = *(iocontrol_data->currenttool);
