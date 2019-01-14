@@ -932,9 +932,9 @@ int main(int argc, char *argv[])
 // When io receives this it sets the appropriate NML code and axis updates the tool loaded display	
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	if(*(iocontrol_data->update) == 1 || *(iocontrol_data->initialised) == 0) // only do this once at startup or by call update
+	if(*(iocontrol_data->initialised) == 0) // only do this once if ATC know the actual tool update emc
     	    {
-	    if((*(iocontrol_data->currenttool) >= 0) && (*(iocontrol_data->currenttool) < *(iocontrol_data->numtools)))
+	    if((*(iocontrol_data->currenttool) > 0) && (*(iocontrol_data->currenttool) < *(iocontrol_data->numtools)))
 		{ // if it contains a valid number
 		*(iocontrol_data->tool_prepare) = 1;
 		*(iocontrol_data->tool_prep_pocket) = *(iocontrol_data->currenttool);
@@ -942,6 +942,20 @@ int main(int argc, char *argv[])
 		*(iocontrol_data->tool_number) = *(iocontrol_data->currenttool);
 		*(iocontrol_data->tool_change) = 1;
 		*(iocontrol_data->initialised) = 1; 
+		emcioStatus.tool.toolInSpindle = *(iocontrol_data->currenttool);
+		reload_tool_number(emcioStatus.tool.toolInSpindle);
+		}
+    	    }
+    	    
+	if(*(iocontrol_data->update) == 1) // Update by system call for reset tool to 0
+    	    {
+	    if((*(iocontrol_data->currenttool) >= 0) && (*(iocontrol_data->currenttool) < *(iocontrol_data->numtools)))
+		{ // if it contains a valid number 0 allowed for reset by ATC after failire
+		*(iocontrol_data->tool_prepare) = 1;
+		*(iocontrol_data->tool_prep_pocket) = *(iocontrol_data->currenttool);
+		*(iocontrol_data->tool_prep_number) = *(iocontrol_data->currenttool);
+		*(iocontrol_data->tool_number) = *(iocontrol_data->currenttool);
+		*(iocontrol_data->tool_change) = 1;
 		emcioStatus.tool.toolInSpindle = *(iocontrol_data->currenttool);
 		reload_tool_number(emcioStatus.tool.toolInSpindle);
 		}
