@@ -27,6 +27,7 @@ int mk_getnetopts(mk_netopts_t *n)
     const char *s, *inifile;
     const char *mkini = "MACHINEKIT_INI";
     char buffer[PATH_MAX];
+    struct hostent *hp;
     int retval = -1;
 
     assert(n != NULL);
@@ -39,6 +40,13 @@ int mk_getnetopts(mk_netopts_t *n)
     }
     strtok(buffer, "."); // get rid of the domain name
     n->hostname = strdup(buffer);
+
+    // Workaround to get the fqdn when /proc/sys/kernel/domainname contains (none)
+    if((hp = gethostbyname(buffer)) == NULL){
+    syslog_async(LOG_ERR, "gethostbyname() failed ?! \n");
+    goto DONE;
+    }
+    n->fqdn = strdup(hp->h_name);
 
     uuid_generate_time(n->proc_uuid);
     uuid_unparse(n->proc_uuid, buffer);
@@ -90,6 +98,12 @@ int mk_getnetopts(mk_netopts_t *n)
     if ((s = iniFind(n->mkinifp, "BIND_IPV6", "MACHINEKIT")) != NULL)
 	n->bind_ipv6 = strdup(s);
 
+    n->announce_format = iniFind(n->mkinifp, "ANNOUNCE_FORMAT", "MACHINEKIT");
+    if(n->announce_format != NULL)
+        n->announce_format = strdup(n->announce_format);
+    else
+        n->announce_format = "MK $SRVNAME on $HOSTNAME";
+
     retval = 0;
  DONE:
     return retval;
@@ -115,6 +129,26 @@ static int bind_ifs(mk_socket_t *s, const argvec_t &ifs)
 	    return -1;
 	}
     }
+    return 0;
+}
+
+static int build_dnsname(mk_netopts_t *n, mk_socket_t *s, char *dest, size_t destl, const char *headline)
+{
+    size_t dest_size = destl < 63 ? destl : 63;
+
+    string dnsnamestr(n->announce_format);
+
+    // Avoiding regex since we have small number of keys and string is short
+    boost::replace_all(dnsnamestr, "$MKUUID", n->service_uuid);
+    boost::replace_all(dnsnamestr, "$HOSTNAME", n->fqdn);
+    boost::replace_all(dnsnamestr, "$SRVNAME", headline);
+    boost::replace_all(dnsnamestr, "$SRVTYPE", s->tag);
+
+    strncpy(dest, dnsnamestr.c_str(), dest_size);
+
+    // strncpy doesn't enforce null termination:
+    dest[dest_size - 1] = '\0';
+
     return 0;
 }
 
@@ -201,7 +235,7 @@ int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const cha
     assert(s != NULL);
     assert(headline != NULL);
 
-    snprintf(name, sizeof(name), "%s on %s.local pid %d", headline, n->hostname, getpid());
+    build_dnsname(n, s, name, sizeof(name), headline);
     s->publisher = zeroconf_service_announce(name,
 					     s->dnssd_type,
 					     s->dnssd_subtype,

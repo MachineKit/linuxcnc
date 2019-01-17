@@ -58,10 +58,11 @@ class CustomFTPHandler(FTPHandler):
 
 class FileService(threading.Thread):
     def __init__(
-        self, ini_file=None, host='', svc_uuid=None, loopback=False, debug=False
+        self, ini_file=None, host='', announce_format=None, svc_uuid=None, loopback=False, debug=False
     ):
         self.debug = debug
         self.host = host
+        self.announce_format=announce_format
         self.loopback = loopback
         self.shutdown = threading.Event()
         self.running = False
@@ -85,6 +86,7 @@ class FileService(threading.Thread):
             dsn=self.file_dsname,
             port=self.file_port,
             host=self.host,
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -417,6 +419,7 @@ class LinuxCNCWrapper(object):
         self,
         context,
         host='',
+        announce_format=None,
         loopback=False,
         ini_file=None,
         svc_uuid=None,
@@ -426,6 +429,7 @@ class LinuxCNCWrapper(object):
     ):
         self.debug = debug
         self.host = host
+        self.announce_format=announce_format
         self.loopback = loopback
         self.ping_interval = ping_interval
         self.shutdown = threading.Event()
@@ -601,6 +605,7 @@ class LinuxCNCWrapper(object):
             dsn=self.status_dsname,
             port=self.status_port,
             host=self.host,
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -610,6 +615,7 @@ class LinuxCNCWrapper(object):
             dsn=self.error_dsname,
             port=self.error_port,
             host=self.host,
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -619,6 +625,7 @@ class LinuxCNCWrapper(object):
             dsn=self.command_dsname,
             port=self.command_port,
             host=self.host,
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -628,15 +635,18 @@ class LinuxCNCWrapper(object):
             dsn=self.preview_dsname,
             port=self.preview_port,
             host=self.host,
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
         self.previewstatus_service = service.Service(
+            name='Preview Status',
             type_='previewstatus',
             svc_uuid=svc_uuid,
             dsn=self.previewstatus_dsname,
             port=self.previewstatus_port,
             host=self.host,
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -2617,6 +2627,8 @@ def main():
     mki = configparser.ConfigParser()
     mki.read(mkini)
     mk_uuid = mki.get("MACHINEKIT", "MKUUID")
+    aformat = mki.has_option("MACHINEKIT", "ANNOUNCE_FORMAT") and \
+        mki.get("MACHINEKIT", "ANNOUNCE_FORMAT") or None
     remote = mki.getint("MACHINEKIT", "REMOTE")
 
     if remote == 0:
@@ -2641,6 +2653,7 @@ def main():
             ini_file=ini_file,
             svc_uuid=mk_uuid,
             host=hostname,
+            announce_format=aformat,
             loopback=(not remote),
             debug=debug,
         )
@@ -2649,6 +2662,7 @@ def main():
         mkwrapper = LinuxCNCWrapper(
             context,
             host=hostname,
+            announce_format=aformat,
             loopback=(not remote),
             ini_file=ini_file,
             svc_uuid=mk_uuid,

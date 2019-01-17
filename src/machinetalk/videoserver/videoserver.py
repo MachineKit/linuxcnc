@@ -34,11 +34,12 @@ class VideoDevice(object):
 
 
 class VideoServer(threading.Thread):
-    def __init__(self, inifile, host='', loopback=False, svc_uuid=None, debug=False):
+    def __init__(self, inifile, host='', loopback=False, announce_format=None, svc_uuid=None, debug=False):
         threading.Thread.__init__(self)
         self.inifile = inifile
         self.host = host
         self.loopback = loopback
+        self.announce_format=announce_format
         self.svc_uuid = svc_uuid
         self.debug = debug
 
@@ -123,6 +124,7 @@ class VideoServer(threading.Thread):
                 dsn=video_device.dsname,
                 port=video_device.port,
                 host=self.host,
+                announce_format=self.announce_format,
                 loopback=self.loopback,
                 debug=self.debug,
             )
@@ -180,6 +182,8 @@ def main():
     mki = configparser.ConfigParser()
     mki.read(mkini)
     mk_uuid = mki.get("MACHINEKIT", "MKUUID")
+    aformat = mki.has_option("MACHINEKIT", "ANNOUNCE_FORMAT") and \
+        mki.get("MACHINEKIT", "ANNOUNCE_FORMAT") or None
     remote = mki.getint("MACHINEKIT", "REMOTE")
 
     if remote == 0:
@@ -193,7 +197,7 @@ def main():
 
     hostname = '%(fqdn)s'  # replaced by service announcement
     video = VideoServer(
-        args.ini, svc_uuid=mk_uuid, host=hostname, loopback=(not remote), debug=debug
+        args.ini, svc_uuid=mk_uuid, host=hostname, loopback=(not remote), announce_format=aformat, debug=debug
     )
     video.setDaemon(True)
     video.start()
