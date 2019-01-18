@@ -99,8 +99,8 @@ REMOTE=0
 #
 # Valid key values for subsitution at publication are:
 # $MKUUID - The MKUUID specified above
-# $HOSTNAME - The instance hostname reported by avahi
-# $SRVNAME - The pretty name of the service (HAL RCOMP, Launcher, ...)
+# $HOSTNAME - The instance fully qualified domain name
+# $SRVNAME - The pretty name of the service (HAL RComp, Launcher, ...)
 # $SRVTYPE - The type of service published (launcher, status, ...)
 #
 # An example using MKUUID instead of hostname:
