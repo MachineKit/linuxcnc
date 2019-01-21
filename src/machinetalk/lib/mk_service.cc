@@ -242,7 +242,7 @@ int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const cha
     assert(s != NULL);
     assert(headline != NULL);
 
-    if(retval = build_dnsname(n, s, name, sizeof(name), headline)) {
+    if((retval = build_dnsname(n, s, name, sizeof(name), headline))) {
         return retval;
     }
 
