@@ -176,7 +176,7 @@ zmq_init(htself_t *self)
     if (mk_bindsocket(np, ms))
 	return -1;
     assert(ms->port > -1);
-    if (mk_announce(np, ms, "HAL Group service", NULL))
+    if (mk_announce(np, ms, "HAL Group", NULL))
 	return -1;
     rtapi_print_msg(RTAPI_MSG_DBG, "%s: talking HALGroup on '%s'",
 		    conf.progname, ms->announced_uri);
@@ -192,7 +192,7 @@ zmq_init(htself_t *self)
     if (mk_bindsocket(np, ms))
 	return -1;
     assert(ms->port > -1);
-    if (mk_announce(np, ms, "HAL Rcomp service", NULL))
+    if (mk_announce(np, ms, "HAL Rcomp", NULL))
 	return -1;
     rtapi_print_msg(RTAPI_MSG_DBG, "%s: talking HALRcomp on '%s'",
 		    conf.progname, ms->announced_uri);
@@ -208,7 +208,7 @@ zmq_init(htself_t *self)
     if (mk_bindsocket(np, ms))
 	return -1;
     assert(ms->port > -1);
-    if (mk_announce(np, ms, "HAL Rcommand service", NULL))
+    if (mk_announce(np, ms, "HAL Rcommand", NULL))
 	return -1;
     rtapi_print_msg(RTAPI_MSG_DBG, "%s: talking HALComand on '%s'",
 		    conf.progname, ms->announced_uri);

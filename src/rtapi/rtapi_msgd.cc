@@ -1108,7 +1108,7 @@ int main(int argc, char **argv)
 	return -1;
     //    assert(logpub.port > -1);
 
-    if (mk_announce(&netopts, &logpub, "Log service", NULL))
+    if (mk_announce(&netopts, &logpub, "Log", NULL))
 	return -1;
 
     zmq_pollitem_t signal_poller =  { 0, signal_fd,   ZMQ_POLLIN };

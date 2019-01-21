@@ -3,6 +3,7 @@ import avahi
 import dbus
 import os
 import uuid
+import re
 
 
 class ZeroconfService(object):
@@ -12,7 +13,7 @@ class ZeroconfService(object):
 
     def __init__(
         self,
-        name,
+        headline,
         port,
         stype="_http._tcp",
         subtype=None,
@@ -23,7 +24,7 @@ class ZeroconfService(object):
     ):
         if text is None:
             text = []
-        self.name = name
+        self.headline = headline
         self.stype = stype
         self.domain = domain
         self.host = host
@@ -48,7 +49,7 @@ class ZeroconfService(object):
         # insert fqdn in announcement
         fqdn = str(server.GetHostNameFqdn())
         text = [t % {'fqdn': fqdn} for t in self.text]
-        name = self.name % {'fqdn': fqdn}
+        headline = self.headline % {'fqdn': fqdn}
 
         iface = avahi.IF_UNSPEC
         if self.loopback:
@@ -58,7 +59,7 @@ class ZeroconfService(object):
             iface,
             avahi.PROTO_INET,
             dbus.UInt32(0),
-            name,
+            headline,
             self.stype,
             self.domain,
             self.host,
@@ -71,7 +72,7 @@ class ZeroconfService(object):
                 iface,
                 avahi.PROTO_INET,
                 dbus.UInt32(0),
-                name,
+                headline,
                 self.stype,
                 self.domain,
                 self.subtype,
@@ -89,6 +90,24 @@ class Service(object):
     A simple class to publish a Machinekit network service using zeroconf.
     """
 
+    # See https://gist.github.com/bgusach/a967e0587d6e01e889fd1d776c5f3729
+    def __multi_replace(self, string, replacements, ignore_case=False):
+        """
+        Given a string and a dict, replaces occurrences of the dict keys found in the 
+        string, with their corresponding values. The replacements will occur in "one pass", 
+        i.e. there should be no clashes.
+        :param str string: string to perform replacements on
+        :param dict replacements: replacement dictionary {str_to_find: str_to_replace_with}
+        :param bool ignore_case: whether to ignore case when looking for matches
+        :rtype: str the replaced string
+        """
+        if ignore_case:
+            replacements = dict((pair[0].lower(), pair[1]) for pair in sorted(replacements.iteritems()))
+        rep_sorted = sorted(replacements, key=lambda s: (len(s), s), reverse=True)
+        rep_escaped = [re.escape(replacement) for replacement in rep_sorted]
+        pattern = re.compile("|".join(rep_escaped), re.I if ignore_case else 0)
+        return pattern.sub(lambda match: replacements[match.group(0).lower() if ignore_case else match.group(0)], string) 
+
     def __init__(
         self,
         type_,
@@ -97,6 +116,8 @@ class Service(object):
         port,
         name=None,
         host=None,
+        announce_format=None,
+        headline=None,
         loopback=False,
         debug=False,
     ):
@@ -105,6 +126,7 @@ class Service(object):
         self.type = type_
         self.port = port
         self.name = name
+        self.headline = headline
         self.host = host
         self.loopback = loopback
         self.debug = debug
@@ -112,9 +134,21 @@ class Service(object):
         self.stype = '_machinekit._tcp'
         self.subtype = '_%s._sub.%s' % (self.type, self.stype)
 
+        if announce_format is None:
+            announce_format = 'MK $SRVNAME on $HOSTNAME'
+
         if name is None:
-            pid = os.getpid()
-            self.name = '%s service on %s pid %i' % (self.type.title(), self.host, pid)
+            self.name = self.type.title()
+
+        formatdict = {
+            "$MKUUID" : self.svc_uuid,
+            "$HOSTNAME" : self.host,
+            "$SRVNAME" : self.name,
+            "$SRVTYPE" : self.type
+        }
+
+        if headline is None:
+            self.headline = self.__multi_replace(announce_format, formatdict, True)
 
         me = uuid.uuid1()
         self.status_txtrec = [
@@ -132,7 +166,7 @@ class Service(object):
             )
 
         self.statusService = ZeroconfService(
-            self.name,
+            self.headline,
             self.port,
             stype=self.stype,
             subtype=self.subtype,

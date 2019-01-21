@@ -89,8 +89,28 @@ REMOTE=0
 #ANNOUNCE_IPV4=1
 #ANNOUNCE_IPV6=1
 
-
-
+# DNS records announcing services are normalized for clarity, and to avoid
+# accidental collisions in the local domain between multiple instances.
+#
+# ANNOUNCE_FORMAT is prepended to the standard machinekit service type
+# designation. The full DNS record announced in the domain is:
+#
+# ANNOUNCE_FORMAT._machinekit._tcp.local.
+#
+# Valid key values for subsitution at publication are:
+# $MKUUID - The MKUUID specified above
+# $HOSTNAME - The instance fully qualified domain name
+# $SRVNAME - The pretty name of the service (HAL RComp, Launcher, ...)
+# $SRVTYPE - The type of service published (launcher, status, ...)
+#
+# An example using MKUUID instead of hostname:
+# ANNOUNCE_FORMAT=MK $SRVTYPE [$MKUUID]
+#
+# When setting a custom format, you must respect the 63 octet limit
+# for one label of a DNS record, after substitutions are made. 
+# Hint: UUIDs are 36 octets in length when substituted.
+#
+ANNOUNCE_FORMAT=MK $SRVNAME on $HOSTNAME
 
 
 

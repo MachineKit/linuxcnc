@@ -28,6 +28,7 @@ typedef struct {
     char     *process_uuid;     // server instance (this process)
     uuid_t   svc_uuid;          // binary forms of the above
     uuid_t   proc_uuid;
+    const char *fqdn;
     const char *hostname;       // without domain suffix
 
     // filled in by mk_getnetopts() by inspecting $MACHINEKIT_INI:
@@ -40,6 +41,9 @@ typedef struct {
     // handling of mDNS announcements:
     int announce_ipv4;
     int announce_ipv6;
+
+    // Formatting of mDNS announcements:
+    const char *announce_format;
 } mk_netopts_t;
 
 // per-czmq-socket of a daemon:

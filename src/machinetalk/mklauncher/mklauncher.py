@@ -93,9 +93,8 @@ class Mklauncher(object):
         launcher_dirs=None,
         host='',
         svc_uuid='',
+        announce_format=None,
         debug=False,
-        name=None,
-        host_in_name=True,
         poll_interval=0.5,
         ping_interval=2.0,
         loopback=False,
@@ -107,7 +106,7 @@ class Mklauncher(object):
         self.launcher_dirs = launcher_dirs
         self.host = host
         self.loopback = loopback
-        self.name = name
+        self.announce_format = announce_format
         self.debug = debug
         self.shutdown = threading.Event()
         self.running = False
@@ -147,7 +146,7 @@ class Mklauncher(object):
         self.pingCount = 0
 
         self._create_sockets(context)
-        self._create_services(host_in_name, svc_uuid)
+        self._create_services(svc_uuid)
 
     def start(self):
         self._publish_services()
@@ -270,18 +269,15 @@ class Mklauncher(object):
         self._unpublish_services()
         self.running = False
 
-    def _create_services(self, host_in_name, svc_uuid):
-        if self.name is None:
-            self.name = 'Machinekit Launcher'
-        if host_in_name:
-            self.name += ' on ' + self.host
+    def _create_services(self, svc_uuid):
         self.launcher_service = service.Service(
             type_='launcher',
             svc_uuid=svc_uuid,
             dsn=self.launcher_ds_name,
             port=self.launcher_port,
             host=self.host,
-            name=self.name,
+            name='Launcher',
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -291,6 +287,8 @@ class Mklauncher(object):
             dsn=self.command_ds_name,
             port=self.command_port,
             host=self.host,
+            name='Launcher Command',
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -610,15 +608,6 @@ def main():
     parser = argparse.ArgumentParser(
         description='mklauncher is Machinetalk based session/configuration launcher for Machinekit'
     )
-    parser.add_argument(
-        '-n', '--name', help='Name of the machine', default="Machinekit Launcher"
-    )
-    parser.add_argument(
-        '-s',
-        '--suppress_ip',
-        help='Do not show ip of machine in service name',
-        action='store_false',
-    )
     parser.add_argument('-d', '--debug', help='Enable debug mode', action='store_true')
     parser.add_argument(
         'dirs',
@@ -646,6 +635,8 @@ def main():
     mki = configparser.ConfigParser()
     mki.read(mkini)
     uuid = mki.get("MACHINEKIT", "MKUUID")
+    aformat = mki.has_option("MACHINEKIT", "ANNOUNCE_FORMAT") and \
+        mki.get("MACHINEKIT", "ANNOUNCE_FORMAT") or None
     remote = mki.getint("MACHINEKIT", "REMOTE")
 
     if remote == 0:
@@ -666,9 +657,8 @@ def main():
         context,
         svc_uuid=uuid,
         host=hostname,
+        announce_format=aformat,
         launcher_dirs=args.dirs,
-        name=args.name,
-        host_in_name=bool(args.suppress_ip),
         loopback=(not remote),
         debug=debug,
     )

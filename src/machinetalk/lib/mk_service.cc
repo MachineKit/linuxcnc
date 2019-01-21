@@ -27,6 +27,7 @@ int mk_getnetopts(mk_netopts_t *n)
     const char *s, *inifile;
     const char *mkini = "MACHINEKIT_INI";
     char buffer[PATH_MAX];
+    struct hostent *hp;
     int retval = -1;
 
     assert(n != NULL);
@@ -39,6 +40,13 @@ int mk_getnetopts(mk_netopts_t *n)
     }
     strtok(buffer, "."); // get rid of the domain name
     n->hostname = strdup(buffer);
+
+    // Workaround to get the fqdn when /proc/sys/kernel/domainname contains (none)
+    if((hp = gethostbyname(buffer)) == NULL){
+    syslog_async(LOG_ERR, "gethostbyname() failed ?! \n");
+    goto DONE;
+    }
+    n->fqdn = strdup(hp->h_name);
 
     uuid_generate_time(n->proc_uuid);
     uuid_unparse(n->proc_uuid, buffer);
@@ -72,8 +80,9 @@ int mk_getnetopts(mk_netopts_t *n)
 	goto DONE;
     }
 
-
-    iniFindInt(n->mkinifp, "REMOTE", "MACHINEKIT", &n->remote);
+    // default behavior: remote announcement off
+    if(iniFindInt(n->mkinifp, "REMOTE", "MACHINEKIT", &n->remote))
+    n->remote = 0;
 
     // default behaviour: announce on both v4 and v6 addresses
     if (iniFindInt(n->mkinifp, "ANNOUNCE_IPV4", "MACHINEKIT", &n->announce_ipv4))
@@ -89,6 +98,12 @@ int mk_getnetopts(mk_netopts_t *n)
     n->bind_ipv6 = "*";
     if ((s = iniFind(n->mkinifp, "BIND_IPV6", "MACHINEKIT")) != NULL)
 	n->bind_ipv6 = strdup(s);
+
+    n->announce_format = iniFind(n->mkinifp, "ANNOUNCE_FORMAT", "MACHINEKIT");
+    if(n->announce_format != NULL)
+        n->announce_format = strdup(n->announce_format);
+    else
+        n->announce_format = "MK $SRVNAME on $HOSTNAME";
 
     retval = 0;
  DONE:
@@ -115,6 +130,30 @@ static int bind_ifs(mk_socket_t *s, const argvec_t &ifs)
 	    return -1;
 	}
     }
+    return 0;
+}
+
+static int build_dnsname(mk_netopts_t *n, mk_socket_t *s, char *dest, size_t destl, const char *headline)
+{
+    string dnsnamestr(n->announce_format);
+
+    // Avoiding regex since we have small number of keys and string is short
+    boost::replace_all(dnsnamestr, "$MKUUID", n->service_uuid);
+    boost::replace_all(dnsnamestr, "$HOSTNAME", n->fqdn);
+    boost::replace_all(dnsnamestr, "$SRVNAME", headline);
+    boost::replace_all(dnsnamestr, "$SRVTYPE", s->tag);
+
+    if(dnsnamestr.length() > 63) {
+	    syslog_async(LOG_ERR, "Error! DNS announcement label too long '%s' length: %d",
+			 dnsnamestr.c_str(), dnsnamestr.length());
+	    return -1;
+    }
+
+    strncpy(dest, dnsnamestr.c_str(), dnsnamestr.length());
+
+    // strncpy doesn't enforce null termination:
+    dest[dnsnamestr.length()] = '\0';
+
     return 0;
 }
 
@@ -182,12 +221,14 @@ int mk_bindsocket(mk_netopts_t *n, mk_socket_t *s)
 int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const char *path)
 {
     char name[PATH_MAX];
+    int retval = -1;
     int protocol = AVAHI_PROTO_UNSPEC; // default: both ipv4 and ipv6
 
     assert(n != NULL);
 
-    // dont't announce if both ANNOUNCE_IPV4 and ANNOUNCE_IPV6 are zero
-    if (!(n->announce_ipv4 || n->announce_ipv6)) {
+    // don't announce if both ANNOUNCE_IPV4 and ANNOUNCE_IPV6 are zero
+    // or if remote is disabled
+    if (!((n->announce_ipv4 || n->announce_ipv6) && n->remote)) {
         return 0;
     }
 
@@ -201,7 +242,10 @@ int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const cha
     assert(s != NULL);
     assert(headline != NULL);
 
-    snprintf(name, sizeof(name), "%s on %s.local pid %d", headline, n->hostname, getpid());
+    if((retval = build_dnsname(n, s, name, sizeof(name), headline))) {
+        return retval;
+    }
+
     s->publisher = zeroconf_service_announce(name,
 					     s->dnssd_type,
 					     s->dnssd_subtype,

@@ -26,10 +26,9 @@ class ConfigServer(object):
         app_dirs=None,
         topdir=".",
         host='',
+        announce_format=None,
         svc_uuid=None,
         debug=False,
-        name=None,
-        host_in_name=True,
         loopback=False,
     ):
         if app_dirs is None:
@@ -38,7 +37,7 @@ class ConfigServer(object):
         self.appDirs = app_dirs
         self.host = host
         self.loopback = loopback
-        self.name = name
+        self.announce_format = announce_format
         self.debug = debug
         self.shutdown = threading.Event()
         self.running = False
@@ -77,17 +76,14 @@ class ConfigServer(object):
         self.dsname = self.socket.get_string(zmq.LAST_ENDPOINT, encoding='utf-8')
         self.dsname = self.dsname.replace('0.0.0.0', self.host)
 
-        if self.name is None:
-            self.name = "Machinekit"
-        if host_in_name:
-            self.name += ' on ' + self.host
         self.service = service.Service(
             type_='config',
             svc_uuid=svc_uuid,
             dsn=self.dsname,
             port=self.port,
             host=self.host,
-            name=self.name,
+            name='UI Configuration',
+            announce_format=self.announce_format,
             loopback=self.loopback,
             debug=self.debug,
         )
@@ -236,15 +232,6 @@ def main():
     parser = argparse.ArgumentParser(
         description='Configserver is the entry point for Machinetalk based user interfaces'
     )
-    parser.add_argument(
-        '-n', '--name', help='Name of the machine', default="Machinekit"
-    )
-    parser.add_argument(
-        '-s',
-        '--suppress_ip',
-        help='Do not show ip of machine in service name',
-        action='store_false',
-    )
     parser.add_argument('-d', '--debug', help='Enable debug mode', action='store_true')
     parser.add_argument(
         'dirs',
@@ -267,6 +254,8 @@ def main():
     mki = configparser.ConfigParser()
     mki.read(mkini)
     uuid = mki.get("MACHINEKIT", "MKUUID")
+    aformat = mki.has_option("MACHINEKIT", "ANNOUNCE_FORMAT") and \
+        mki.get("MACHINEKIT", "ANNOUNCE_FORMAT") or None
     remote = mki.getint("MACHINEKIT", "REMOTE")
 
     if remote == 0:
@@ -292,9 +281,8 @@ def main():
             svc_uuid=uuid,
             topdir=".",
             host=hostname,
+            announce_format=aformat,
             app_dirs=args.dirs,
-            name=args.name,
-            host_in_name=bool(args.suppress_ip),
             loopback=(not remote),
             debug=debug,
         )
