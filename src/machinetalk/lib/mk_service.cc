@@ -80,8 +80,9 @@ int mk_getnetopts(mk_netopts_t *n)
 	goto DONE;
     }
 
-
-    iniFindInt(n->mkinifp, "REMOTE", "MACHINEKIT", &n->remote);
+    // default behavior: remote announcement off
+    if(iniFindInt(n->mkinifp, "REMOTE", "MACHINEKIT", &n->remote))
+    n->remote = 0;
 
     // default behaviour: announce on both v4 and v6 addresses
     if (iniFindInt(n->mkinifp, "ANNOUNCE_IPV4", "MACHINEKIT", &n->announce_ipv4))
@@ -220,8 +221,9 @@ int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const cha
 
     assert(n != NULL);
 
-    // dont't announce if both ANNOUNCE_IPV4 and ANNOUNCE_IPV6 are zero
-    if (!(n->announce_ipv4 || n->announce_ipv6)) {
+    // don't announce if both ANNOUNCE_IPV4 and ANNOUNCE_IPV6 are zero
+    // or if remote is disabled
+    if (!((n->announce_ipv4 || n->announce_ipv6) && n->remote)) {
         return 0;
     }
 
