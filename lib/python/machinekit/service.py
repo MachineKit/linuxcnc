@@ -150,9 +150,6 @@ class Service(object):
         if headline is None:
             self.headline = self.__multi_replace(announce_format, formatdict, True)
 
-        # Truncate the headline to fit in the DNS length limit
-        self.headline = self.headline[:63]
-
         me = uuid.uuid1()
         self.status_txtrec = [
             str('dsn=' + self.dsn),

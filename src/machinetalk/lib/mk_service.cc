@@ -135,8 +135,6 @@ static int bind_ifs(mk_socket_t *s, const argvec_t &ifs)
 
 static int build_dnsname(mk_netopts_t *n, mk_socket_t *s, char *dest, size_t destl, const char *headline)
 {
-    size_t dest_size = destl < 63 ? destl : 63;
-
     string dnsnamestr(n->announce_format);
 
     // Avoiding regex since we have small number of keys and string is short
@@ -145,10 +143,16 @@ static int build_dnsname(mk_netopts_t *n, mk_socket_t *s, char *dest, size_t des
     boost::replace_all(dnsnamestr, "$SRVNAME", headline);
     boost::replace_all(dnsnamestr, "$SRVTYPE", s->tag);
 
-    strncpy(dest, dnsnamestr.c_str(), dest_size);
+    if(dnsnamestr.length() > 63) {
+	    syslog_async(LOG_ERR, "Error! DNS announcement label too long '%s' length: %d",
+			 dnsnamestr.c_str(), dnsnamestr.length());
+	    return -1;
+    }
+
+    strncpy(dest, dnsnamestr.c_str(), dnsnamestr.length());
 
     // strncpy doesn't enforce null termination:
-    dest[dest_size - 1] = '\0';
+    dest[dnsnamestr.length()] = '\0';
 
     return 0;
 }
@@ -217,6 +221,7 @@ int mk_bindsocket(mk_netopts_t *n, mk_socket_t *s)
 int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const char *path)
 {
     char name[PATH_MAX];
+    int retval = -1;
     int protocol = AVAHI_PROTO_UNSPEC; // default: both ipv4 and ipv6
 
     assert(n != NULL);
@@ -237,7 +242,10 @@ int mk_announce(mk_netopts_t *n, mk_socket_t *s, const char *headline, const cha
     assert(s != NULL);
     assert(headline != NULL);
 
-    build_dnsname(n, s, name, sizeof(name), headline);
+    if(retval = build_dnsname(n, s, name, sizeof(name), headline)) {
+        return retval;
+    }
+
     s->publisher = zeroconf_service_announce(name,
 					     s->dnssd_type,
 					     s->dnssd_subtype,

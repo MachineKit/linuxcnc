@@ -104,8 +104,13 @@ REMOTE=0
 # $SRVTYPE - The type of service published (launcher, status, ...)
 #
 # An example using MKUUID instead of hostname:
-# ANNOUNCE_FORMAT="MK $SRVTYPE [$MKUUID]"
-ANNOUNCE_FORMAT="MK $SRVNAME on $HOSTNAME"
+# ANNOUNCE_FORMAT=MK $SRVTYPE [$MKUUID]
+#
+# When setting a custom format, you must respect the 63 octet limit
+# for one label of a DNS record, after substitutions are made. 
+# Hint: UUIDs are 36 octets in length when substituted.
+#
+ANNOUNCE_FORMAT=MK $SRVNAME on $HOSTNAME
 
 
 
