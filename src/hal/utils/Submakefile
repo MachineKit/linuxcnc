@@ -7,6 +7,9 @@ HALCMDSRCS += hal/utils/halcmd_completion.c
 endif
 USERSRCS += $(sort $(HALCMDSRCS) $(HALSHSRCS) $(HALCMDCCSRCS))
 
+## since Dec 2014 tcl8.x-dev has not cotained code for tclstubs
+## now in package tcl-dev containing libtclstub.a
+## without this linked, some tcl programs (halshow) will not work
 $(call TOOBJSDEPS, $(HALSHSRCS)) : EXTRAFLAGS = -fPIC
 $(call TOOBJSDEPS, hal/utils/halsh.c) : EXTRAFLAGS += $(TCL_CFLAGS)
 ../tcl/hal.so: $(call TOOBJS, $(HALSHSRCS)) \
@@ -14,9 +17,9 @@ $(call TOOBJSDEPS, hal/utils/halsh.c) : EXTRAFLAGS += $(TCL_CFLAGS)
 	../lib/liblinuxcnchal.so.0 \
 	../lib/libmachinetalk-pb2++.so.0 \
 	../lib/libmtalk.so.0 \
-	../lib/librtapi_math.so.0
+	../lib/librtapi_math.so.0 
 	$(ECHO) Linking $(notdir $@)
-	$(Q)$(CC) $(LDFLAGS) -shared $^  -o $@
+	$(Q)$(CC) $(LDFLAGS) -shared $^ -o $@ -ltclstub
 TARGETS += ../tcl/hal.so
 
 $(call TOOBJSDEPS, $(HALCMDCCSRCS)) : EXTRAFLAGS =  \
