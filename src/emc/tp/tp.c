@@ -135,6 +135,17 @@ STATIC int tcRotaryMotionCheck(TC_STRUCT const * const tc) {
  */
 
 
+
+/**
+ * Wrapper to bounds-check the tangent kink ratio from HAL.
+ */
+STATIC double tpGetTangentKinkRatio(TP_STRUCT const * const tp) {
+    const double max_ratio = 0.7071;
+    const double min_ratio = 0.001;
+
+    return rtapi_fmax(rtapi_fmin(get_arcBlendTangentKinkRatio(tp->shared),max_ratio),min_ratio);
+}
+
 STATIC int tpGetMachineAccelBounds(TP_STRUCT const * const tp, PmCartesian  * const acc_bound)
 {
     if (!acc_bound) {
@@ -236,14 +247,17 @@ STATIC inline double tpGetRealTargetVel(TP_STRUCT const * const tp,
 }
 
 
-STATIC inline double getMaxFeedScale(TC_STRUCT const * tc)
+STATIC inline double getMaxFeedScale(TC_STRUCT const * tc, tp_shared_t *ts)
 {
     //All reasons to disable feed override go here
     if (tc && tc->synchronized == TC_SYNC_POSITION ) {
         return 1.0;
     } else {
-        return emcmotConfig->maxFeedScale;
+        return get_maxFeedScale(ts);
     }
+
+    // GCC warning workaround
+    return 0;
 }
 
 
@@ -833,13 +847,13 @@ STATIC int tcSetLineXYZ(TC_STRUCT * const tc, PmCartLine const * const line)
  * acceleration will be drastically reduced to ensure that the transition is
  * within velocity / acceleration limits.
  */
-static void forceTangentSegments(TC_STRUCT *prev_tc, TC_STRUCT *tc)
+static void forceTangentSegments(TP_STRUCT const * const tp, TC_STRUCT *prev_tc, TC_STRUCT *tc)
 {
     // Fall back to tangent, using kink_vel as final velocity
     tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
 
     // Finally, reduce acceleration proportionally to prevent violations during "kink"
-    const double kink_ratio = tpGetTangentKinkRatio();
+    const double kink_ratio = tpGetTangentKinkRatio(tp);
     tpAdjustAccelForTangent(tc, kink_ratio);
     tpAdjustAccelForTangent(prev_tc, kink_ratio);
 }
@@ -911,7 +925,7 @@ STATIC tc_blend_type_t tpChooseBestBlend(TP_STRUCT const * const tp,
             break;
         case TANGENT_SEGMENTS_BLEND: // tangent
             tp_debug_print("using approximate tangent blend\n");
-            forceTangentSegments(prev_tc, tc);
+            forceTangentSegments(tp, prev_tc, tc);
             break;
         case ARC_BLEND: // arc blend
             tp_debug_print("using blend arc\n");
@@ -1662,7 +1676,7 @@ STATIC int tpComputeOptimalVelocity(TP_STRUCT const * const tp, TC_STRUCT * cons
     double vf_limit_prev = prev1_tc->maxvel;
     if (prev1_tc->kink_vel >=0  && prev1_tc->term_cond == TC_TERM_COND_TANGENT) {
         // Only care about kink_vel with tangent segments
-        vf_limit_prev = fmin(vf_limit_prev, prev1_tc->kink_vel);
+        vf_limit_prev = rtapi_fmin(vf_limit_prev, prev1_tc->kink_vel);
     }
     //Limit the PREVIOUS velocity by how much we can overshoot into
     double vf_limit = rtapi_fmin(vf_limit_this, vf_limit_prev);
@@ -1874,8 +1888,8 @@ STATIC int tpSetupTangent(TP_STRUCT const * const tp,
 
     // Calculate instantaneous acceleration required for change in direction
     // from v1 to v2, assuming constant speed
-    double v_max1 = tcGetMaxTargetVel(prev_tc, getMaxFeedScale(prev_tc));
-    double v_max2 = tcGetMaxTargetVel(tc, getMaxFeedScale(tc));
+    double v_max1 = tcGetMaxTargetVel(prev_tc, getMaxFeedScale(prev_tc, tp->shared));
+    double v_max2 = tcGetMaxTargetVel(tc, getMaxFeedScale(tc, tp->shared));
     // Note that this is a minimum since the velocity at the intersection must
     // be the slower of the two segments not to violate constraints.
     double v_max = rtapi_fmin(v_max1, v_max2);
