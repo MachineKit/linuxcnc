@@ -1603,6 +1603,12 @@ int blendPoints3Print(BlendPoints3 const * const points)
 
 }
 
+double pmCartAbsMax(PmCartesian const * const v)
+{
+    return rtapi_fmax(rtapi_fmax(rtapi_fabs(v->x),rtapi_fabs(v->y)),rtapi_fabs(v->z));
+}
+
+
 PmCircleLimits pmCircleActualMaxVel(PmCircle const * circle,
         double v_max, 
         double a_max)

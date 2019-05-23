@@ -1722,11 +1722,6 @@ STATIC int tpRunOptimization(TP_STRUCT * const tp) {
     return TP_ERR_OK;
 }
 
-STATIC double pmCartAbsMax(PmCartesian const * const v)
-{
-    return rtapi_fmax(rtapi_fmax(rtapi_fabs(v->x),rtapi_fabs(v->y)),rtapi_fabs(v->z));
-}
-
 
 /**
  * Check for tangency between the current segment and previous segment.
