@@ -52,9 +52,36 @@ double tcGetMaxTargetVel(TC_STRUCT const * const tc,
     return rtapi_fmin(v_max_target, tc->maxvel);
 }
 
-double tcGetMaxAccel(const TC_STRUCT *tc)
+double tcGetOverallMaxAccel(const TC_STRUCT *tc)
+{    
+    // Handle any acceleration reduction due to an approximate-tangent "blend" with the previous or next segment
+    double a_scale = (1.0 - rtapi_fmax(tc->kink_accel_reduce, tc->kink_accel_reduce_prev));
+
+    // Parabolic blending conditions: If the next segment or previous segment
+    // has a parabolic blend with this one, acceleration is scaled down by 1/2
+    // so that the sum of the two does not exceed the maximum.
+    if (tc->blend_prev || TC_TERM_COND_PARABOLIC == tc->term_cond) {
+        a_scale *= 0.5;
+    }
+
+    return tc->maxaccel * a_scale;
+}
+
+/**
+ * Get acceleration for a tc based on the trajectory planner state.
+ */
+double tcGetTangentialMaxAccel(TC_STRUCT const * const tc)
 {
-    return tc->maxaccel * (1.0 - rtapi_fmax(tc->kink_accel_reduce, tc->kink_accel_reduce_prev));
+    double a_scale = tcGetOverallMaxAccel(tc);
+
+    // Reduce allowed tangential acceleration in circular motions to stay
+    // within overall limits (accounts for centripetal acceleration while
+    // moving along the circular path).
+    if (tc->motion_type == TC_CIRCULAR || tc->motion_type == TC_SPHERICAL) {
+        //Limit acceleration for cirular arcs to allow for normal acceleration
+        a_scale *= tc->acc_ratio_tan;
+    }
+    return a_scale;
 }
 
 int tcSetKinkProperties(TC_STRUCT *prev_tc, TC_STRUCT *tc, double kink_vel, double accel_reduction)
@@ -99,7 +126,7 @@ int tcCircleStartAccelUnitVector(TC_STRUCT const * const tc, PmCartesian * const
     pmCartCartSub(&tc->coords.circle.xyz.center, &startpoint, &perp);
     pmCartUnitEq(&perp);
 
-    pmCartScalMult(&tan, tcGetMaxAccel(tc), &tan);
+    pmCartScalMult(&tan, tcGetOverallMaxAccel(tc), &tan);
     pmCartScalMultEq(&perp, pmSq(0.5 * tc->reqvel)/tc->coords.circle.xyz.radius);
     pmCartCartAdd(&tan, &perp, out);
     pmCartUnitEq(out);
@@ -730,11 +757,10 @@ int tcFinalizeLength(TC_STRUCT * const tc)
 
     tp_debug_print("Finalizing tc id %d, type %d\n", tc->id, tc->motion_type);
     //TODO function to check for parabolic?
-    int parabolic = (tc->blend_prev || tc->term_cond == TC_TERM_COND_PARABOLIC);
     tp_debug_print("blend_prev = %d, term_cond = %d\n",tc->blend_prev, tc->term_cond);
 
     if (tc->motion_type == TC_CIRCULAR) {
-        tc->maxvel = pmCircleActualMaxVel(&tc->coords.circle.xyz, &tc->acc_ratio_tan, tc->maxvel, tc->maxaccel, parabolic);
+        tc->maxvel = pmCircleActualMaxVel(&tc->coords.circle.xyz, &tc->acc_ratio_tan, tc->maxvel, tcGetOverallMaxAccel(tc));
     }
 
     tcClampVelocityByLength(tc);
