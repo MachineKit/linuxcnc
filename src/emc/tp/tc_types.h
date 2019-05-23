@@ -132,6 +132,7 @@ typedef struct {
 
     //Acceleration
     double maxaccel;        // accel calc'd by task
+    double acc_ratio_tan;   // ratio between normal and tangential accel
     
     int id;                 // segment's serial number
     struct state_tag_t tag; /* state tag corresponding to running motion */
