@@ -54,6 +54,7 @@ typedef int (*tpAddLine_t)(TP_STRUCT * tp,
 			   unsigned char enables,
 			   char atspeed,
 			   int indexrotary,
+               int pure_angular,
 			    struct state_tag_t tag);
 typedef int (*tpAddCircle_t)(TP_STRUCT * tp,
 			     EmcPose end,

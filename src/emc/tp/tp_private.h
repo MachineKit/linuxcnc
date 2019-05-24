@@ -46,7 +46,7 @@ int tpAddRigidTap(TP_STRUCT * tp, EmcPose end, double vel, double
 
 int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double
 	      ini_maxvel, double acc, unsigned char enables, char atspeed,
-	      int indexrotary,struct state_tag_t tag);
+	      int indexrotary, int pure_angular, struct state_tag_t tag);
 
 int tpAddCircle(TP_STRUCT * tp, EmcPose end, PmCartesian center,
 		PmCartesian normal, int turn, int type, double vel, double ini_maxvel,

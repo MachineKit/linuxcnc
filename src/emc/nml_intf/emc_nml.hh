@@ -490,7 +490,7 @@ class EMC_AXIS_STAT:public EMC_AXIS_STAT_MSG {
 class EMC_TRAJ_CMD_MSG:public RCS_CMD_MSG {
   public:
     EMC_TRAJ_CMD_MSG(NMLTYPE t, size_t s): RCS_CMD_MSG(t, s),tag(){
-    };
+    }
 
     //NOTE this does NOT have a corresponding CMS update. This only works
     //because motion commands don't actually go through NML.
@@ -792,6 +792,7 @@ class EMC_TRAJ_LINEAR_MOVE:public EMC_TRAJ_CMD_MSG {
     double vel, ini_maxvel, acc;
     int feed_mode;
     int indexrotary;
+    int pure_angular;
 };
 
 class EMC_TRAJ_CIRCULAR_MOVE:public EMC_TRAJ_CMD_MSG {
@@ -948,6 +949,7 @@ class EMC_TRAJ_PROBE:public EMC_TRAJ_CMD_MSG {
     EmcPose pos;
     int type;
     double vel, ini_maxvel, acc;
+    int pure_angular;
     unsigned char probe_type;
 };
 

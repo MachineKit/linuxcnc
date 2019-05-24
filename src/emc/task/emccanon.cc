@@ -1009,6 +1009,7 @@ static void flush_segments(void) {
     linearMoveMsg.end.b = TO_EXT_ANG(b);
     linearMoveMsg.end.c = TO_EXT_ANG(c);
 
+    linearMoveMsg.pure_angular = angular_move && !cartesian_move;
     linearMoveMsg.vel = toExtVel(vel);
     linearMoveMsg.ini_maxvel = toExtVel(linedata.vel);
     AccelData lineaccdata = getStraightAcceleration(x, y, z, a, b, c, u, v, w);
@@ -1130,6 +1131,7 @@ void STRAIGHT_TRAVERSE(int line_number,
     acc = accdata.acc;
 
     linearMoveMsg.end = to_ext_pose(x,y,z,a,b,c,u,v,w);
+    linearMoveMsg.pure_angular = angular_move && !cartesian_move;
     linearMoveMsg.vel = linearMoveMsg.ini_maxvel = toExtVel(vel);
     linearMoveMsg.acc = toExtAcc(acc);
     linearMoveMsg.indexrotary = rotary_unlock_for_traverse;
@@ -1153,9 +1155,6 @@ void STRAIGHT_FEED(int line_number,
                    double a, double b, double c,
                    double u, double v, double w)
 {
-    EMC_TRAJ_LINEAR_MOVE linearMoveMsg;
-    linearMoveMsg.feed_mode = feed_mode;
-
     from_prog(x,y,z,a,b,c,u,v,w);
     rotate_and_offset_pos(x,y,z,a,b,c,u,v,w);
     see_segment(line_number, _tag, x, y, z, a, b, c, u, v, w);
@@ -1243,6 +1242,7 @@ void STRAIGHT_PROBE(int line_number,
     probeMsg.vel = toExtVel(vel);
     probeMsg.ini_maxvel = toExtVel(ini_maxvel);
     probeMsg.acc = toExtAcc(acc);
+    probeMsg.pure_angular = angular_move & ! cartesian_move;
 
     probeMsg.type = EMC_MOTION_TYPE_PROBING;
     probeMsg.probe_type = probe_type;
@@ -1857,6 +1857,7 @@ void ARC_FEED(int line_number,
         // or we wouldn't be calling ARC_FEED
         linearMoveMsg.end = to_ext_pose(endpt);
         linearMoveMsg.type = EMC_MOTION_TYPE_ARC;
+        linearMoveMsg.pure_angular = angular_move && !cartesian_move;
         linearMoveMsg.vel = toExtVel(vel);
         linearMoveMsg.ini_maxvel = toExtVel(v_max);
         linearMoveMsg.acc = toExtAcc(a_max);
@@ -2139,6 +2140,7 @@ void CHANGE_TOOL(int slot)
 
         linearMoveMsg.end = to_ext_pose(x, y, z, a, b, c, u, v, w);
 
+        linearMoveMsg.pure_angular = angular_move && !cartesian_move;
         linearMoveMsg.vel = linearMoveMsg.ini_maxvel = toExtVel(vel);
         linearMoveMsg.acc = toExtAcc(acc);
         linearMoveMsg.type = EMC_MOTION_TYPE_TOOLCHANGE;

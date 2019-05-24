@@ -949,6 +949,7 @@ int emcmotCommandHandler(void *arg, const hal_funct_args_t *fa)
 							   emcmotStatus->enables_new,
 							   issue_atspeed,
 							   emcmotCommand->turn,
+							   emcmotCommand->pure_angular,
 							   emcmotCommand->tag);
         if (res_addline != 0) {
             reportError(_("can't add linear move at line %d, error code %d"),
@@ -1469,6 +1470,7 @@ int emcmotCommandHandler(void *arg, const hal_funct_args_t *fa)
 						   emcmotCommand->acc,
 						   emcmotStatus->enables_new,
 						   0, -1,
+						   emcmotCommand->pure_angular,
 						   emcmotCommand->tag)) {
 		reportError(_("can't add probe move"));
 		emcmotStatus->commandStatus = EMCMOT_COMMAND_BAD_EXEC;

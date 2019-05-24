@@ -617,6 +617,7 @@ static void process_inputs(void)
 						   // FIMXE: unsure
 						   0,     // FIXME: dont wait for atspeed (?)
 						   -1,
+						   emcmotCommand->pure_angular,
 						   emcmotCommand->tag)) {
 		reportError(_("can't add coordinated return move"));
 		emcmotStatus->commandStatus = EMCMOT_COMMAND_BAD_EXEC;
@@ -658,6 +659,7 @@ static void process_inputs(void)
 				emcmotStatus->enables_new,  // ???
 				0, // dont wait for atspeed  ???
 				-1,
+				emcmotCommand->pure_angular,
                 emcmotCommand->tag)) { // no indexrotary action ???
 		reportError(_("can't add linear coordinated jog move"));
 		emcmotStatus->commandStatus = EMCMOT_COMMAND_BAD_EXEC;
