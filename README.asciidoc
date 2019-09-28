@@ -28,6 +28,7 @@ for digital logic, motion, control loops, signal processing, and hardware
 drivers. Machinekit supports local and networked UI options, including 
 ubiquitous platforms like phones or tablets.
 
+
 == Getting Machinekit
 
 The easiest way to get up-and-running is to install Debian Stretch and get the binary packages. 
