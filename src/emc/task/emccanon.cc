@@ -57,7 +57,6 @@ static int debug_velacc = 0;
 static double css_maximum, css_numerator; // both always positive
 static int spindle_dir = 0;
 
-static const double tiny = 1e-7;
 static double xy_rotation = 0.;
 static int rotary_unlock_for_traverse = -1;
 
@@ -616,12 +615,67 @@ void SET_FEED_REFERENCE(CANON_FEED_REFERENCE reference)
 }
 
 /**
+ * Get the shortest linear axis displacement that the TP can handle as a discrete move.
+ *
+ * If this looks dirty, it's because it is. Canon runs in its own units, but
+ * the TP uses user units. Therefore, the minimum displacement has to be
+ * computed the same way, with the same threshold, or short moves do strange
+ * things (accel violations or infinite pauses).
+ *
+ * @todo revisit this when the TP is overhauled to use a consistent set of internal units.
+ */
+static double getMinLinearDisplacement()
+{
+    return FROM_EXT_LEN(CART_FUZZ);
+}
+
+/**
+ * Equivalent of getMinLinearDisplacement for rotary axes.
+ */
+static double getMinAngularDisplacement()
+{
+    return FROM_EXT_ANG(CART_FUZZ);
+}
+
+/**
+ * Apply the minimum displacement check to each axis delta.
+ *
+ * Checks that the axis is valid / active, and looks up the appropriate minimum
+ * displacement for the axis type and user units.
+ */
+static void applyMinDisplacement(double &dx,
+                                 double &dy,
+                                 double &dz,
+                                 double &da,
+                                 double &db,
+                                 double &dc,
+                                 double &du,
+                                 double &dv,
+                                 double &dw
+                                 )
+{
+    const double tiny_linear = getMinLinearDisplacement();
+    const double tiny_angular = getMinAngularDisplacement();
+    if(!axis_valid(0) || dx < tiny_linear) dx = 0.0;
+    if(!axis_valid(1) || dy < tiny_linear) dy = 0.0;
+    if(!axis_valid(2) || dz < tiny_linear) dz = 0.0;
+    if(!axis_valid(3) || da < tiny_angular) da = 0.0;
+    if(!axis_valid(4) || db < tiny_linear) db = 0.0;
+    if(!axis_valid(5) || dc < tiny_linear) dc = 0.0;
+    if(!axis_valid(6) || du < tiny_linear) du = 0.0;
+    if(!axis_valid(7) || dv < tiny_linear) dv = 0.0;
+    if(!axis_valid(8) || dw < tiny_linear) dw = 0.0;
+}
+
+
+/**
  * Get the limiting acceleration for a displacement from the current position to the given position.
  * returns a single acceleration that is the minimum of all axis accelerations.
  */
 static AccelData getStraightAcceleration(double x, double y, double z,
                                double a, double b, double c,
-                               double u, double v, double w)
+                               double u, double v, double w,
+                               int known_xyz_motion)
 {
     double dx, dy, dz, du, dv, dw, da, db, dc;
     double tx, ty, tz, tu, tv, tw, ta, tb, tc;
@@ -642,25 +696,20 @@ static AccelData getStraightAcceleration(double x, double y, double z,
     dv = rtapi_fabs(v - canonEndPoint.v);
     dw = rtapi_fabs(w - canonEndPoint.w);
 
-    if(!axis_valid(0) || dx < tiny) dx = 0.0;
-    if(!axis_valid(1) || dy < tiny) dy = 0.0;
-    if(!axis_valid(2) || dz < tiny) dz = 0.0;
-    if(!axis_valid(3) || da < tiny) da = 0.0;
-    if(!axis_valid(4) || db < tiny) db = 0.0;
-    if(!axis_valid(5) || dc < tiny) dc = 0.0;
-    if(!axis_valid(6) || du < tiny) du = 0.0;
-    if(!axis_valid(7) || dv < tiny) dv = 0.0;
-    if(!axis_valid(8) || dw < tiny) dw = 0.0;
+    applyMinDisplacement(dx, dy, dz, da, db, dc, du, dv, dw);
 
     if(debug_velacc) 
-        printf("getStraightAcceleration dx %g dy %g dz %g da %g db %g dc %g du %g dv %g dw %g ", 
+                printf("getStraightAcceleration dx %g dy %g dz %g da %g db %g"
+               " dc %g du %g dv %g dw %g\n", 
                dx, dy, dz, da, db, dc, du, dv, dw);
 
     // Figure out what kind of move we're making.  This is used to determine
     // the units of vel/acc.
-    if (dx <= 0.0 && dy <= 0.0 && dz <= 0.0 &&
+    if (known_xyz_motion)
+      cartesian_move = 1;
+    else if (dx <= 0.0 && dy <= 0.0 && dz <= 0.0 &&
         du <= 0.0 && dv <= 0.0 && dw <= 0.0) {
-	cartesian_move = 0;
+	    cartesian_move = 0;
     } else {
 	cartesian_move = 1;
     }
@@ -740,7 +789,17 @@ static AccelData getStraightAcceleration(double x, double y, double z,
     return out;
 }
 
-static AccelData getStraightAcceleration(CANON_POSITION pos)
+static AccelData getStraightAcceleration(
+  double x, double y, double z,
+  double a, double b, double c,
+  double u, double v, double w)
+{
+    return getStraightAcceleration(
+      x, y, z, a, b, c, u, v, w, 0);
+}
+
+static AccelData getStraightAcceleration(CANON_POSITION pos,
+                                         int known_xyz_motion)
 {
 
     return getStraightAcceleration(pos.x,
@@ -780,15 +839,7 @@ static VelData getStraightVelocity(double x, double y, double z,
     dv = rtapi_fabs(v - canonEndPoint.v);
     dw = rtapi_fabs(w - canonEndPoint.w);
 
-    if(!axis_valid(0) || dx < tiny) dx = 0.0;
-    if(!axis_valid(1) || dy < tiny) dy = 0.0;
-    if(!axis_valid(2) || dz < tiny) dz = 0.0;
-    if(!axis_valid(3) || da < tiny) da = 0.0;
-    if(!axis_valid(4) || db < tiny) db = 0.0;
-    if(!axis_valid(5) || dc < tiny) dc = 0.0;
-    if(!axis_valid(6) || du < tiny) du = 0.0;
-    if(!axis_valid(7) || dv < tiny) dv = 0.0;
-    if(!axis_valid(8) || dw < tiny) dw = 0.0;
+    applyMinDisplacement(dx, dy, dz, da, db, dc, du, dv, dw);
 
     if(debug_velacc) 
         printf("getStraightVelocity dx %g dy %g dz %g da %g db %g dc %g du %g dv %g dw %g\n",
@@ -958,6 +1009,7 @@ static void flush_segments(void) {
     linearMoveMsg.end.b = TO_EXT_ANG(b);
     linearMoveMsg.end.c = TO_EXT_ANG(c);
 
+    linearMoveMsg.pure_angular = angular_move && !cartesian_move;
     linearMoveMsg.vel = toExtVel(vel);
     linearMoveMsg.ini_maxvel = toExtVel(linedata.vel);
     AccelData lineaccdata = getStraightAcceleration(x, y, z, a, b, c, u, v, w);
@@ -1079,6 +1131,7 @@ void STRAIGHT_TRAVERSE(int line_number,
     acc = accdata.acc;
 
     linearMoveMsg.end = to_ext_pose(x,y,z,a,b,c,u,v,w);
+    linearMoveMsg.pure_angular = angular_move && !cartesian_move;
     linearMoveMsg.vel = linearMoveMsg.ini_maxvel = toExtVel(vel);
     linearMoveMsg.acc = toExtAcc(acc);
     linearMoveMsg.indexrotary = rotary_unlock_for_traverse;
@@ -1102,9 +1155,6 @@ void STRAIGHT_FEED(int line_number,
                    double a, double b, double c,
                    double u, double v, double w)
 {
-    EMC_TRAJ_LINEAR_MOVE linearMoveMsg;
-    linearMoveMsg.feed_mode = feed_mode;
-
     from_prog(x,y,z,a,b,c,u,v,w);
     rotate_and_offset_pos(x,y,z,a,b,c,u,v,w);
     see_segment(line_number, _tag, x, y, z, a, b, c, u, v, w);
@@ -1192,6 +1242,7 @@ void STRAIGHT_PROBE(int line_number,
     probeMsg.vel = toExtVel(vel);
     probeMsg.ini_maxvel = toExtVel(ini_maxvel);
     probeMsg.acc = toExtAcc(acc);
+    probeMsg.pure_angular = angular_move & ! cartesian_move;
 
     probeMsg.type = EMC_MOTION_TYPE_PROBING;
     probeMsg.probe_type = probe_type;
@@ -1779,7 +1830,8 @@ void ARC_FEED(int line_number,
     
     // Use "straight" acceleration measure to compute acceleration bounds due
     // to non-circular components (helical axis, other axes)
-    AccelData accdata = getStraightAcceleration(endpt);
+    AccelData accdata = getStraightAcceleration(
+      endpt, rtapi_fabs(total_xyz_length) > 0.000001);
 
     double tt_max_motion = accdata.tmax;
     double tt_max_spiral = spiral_length / a_max_axes;
@@ -1805,6 +1857,7 @@ void ARC_FEED(int line_number,
         // or we wouldn't be calling ARC_FEED
         linearMoveMsg.end = to_ext_pose(endpt);
         linearMoveMsg.type = EMC_MOTION_TYPE_ARC;
+        linearMoveMsg.pure_angular = angular_move && !cartesian_move;
         linearMoveMsg.vel = toExtVel(vel);
         linearMoveMsg.ini_maxvel = toExtVel(v_max);
         linearMoveMsg.acc = toExtAcc(a_max);
@@ -1818,7 +1871,7 @@ void ARC_FEED(int line_number,
 
         // Convert internal center and normal to external units
         circularMoveMsg.center = to_ext_len(center_cart);
-        circularMoveMsg.normal = to_ext_len(normal_cart);
+        circularMoveMsg.normal = normal_cart;
 
         if (rotation > 0)
             circularMoveMsg.turn = rotation - 1;
@@ -2087,6 +2140,7 @@ void CHANGE_TOOL(int slot)
 
         linearMoveMsg.end = to_ext_pose(x, y, z, a, b, c, u, v, w);
 
+        linearMoveMsg.pure_angular = angular_move && !cartesian_move;
         linearMoveMsg.vel = linearMoveMsg.ini_maxvel = toExtVel(vel);
         linearMoveMsg.acc = toExtAcc(acc);
         linearMoveMsg.type = EMC_MOTION_TYPE_TOOLCHANGE;

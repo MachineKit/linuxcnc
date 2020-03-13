@@ -1204,9 +1204,9 @@ static int init_comm_buffers(void)
 
 //    tpInit(&emcmotDebug->queue); // tpInit called from tpCreate
     emcmotConfig->vtp->tpSetCycleTime(emcmotQueue, emcmotConfig->trajCycleTime);
-    emcmotConfig->vtp->tpSetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
-    emcmotConfig->vtp->tpSetVmax(emcmotQueue, emcmotStatus->vel, emcmotStatus->vel);
-    emcmotConfig->vtp->tpSetAmax(emcmotQueue, emcmotStatus->acc);
+    int res_pos = emcmotConfig->vtp->tpSetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
+    int res_vel = emcmotConfig->vtp->tpSetVmax(emcmotQueue, emcmotStatus->vel, emcmotStatus->vel);
+    int res_acc = emcmotConfig->vtp->tpSetAmax(emcmotQueue, emcmotStatus->acc);
 
     // the emcmotAltQueue parameters as per above are cloned
     // by tpSnapshot() during switching queues
@@ -1214,7 +1214,7 @@ static int init_comm_buffers(void)
     emcmotStatus->tail = 0;
 
     rtapi_print_msg(RTAPI_MSG_INFO, "MOTION: init_comm_buffers() complete\n");
-    return 0;
+    return res_pos | res_vel | res_acc;
 }
 
 /* init_threads() creates realtime threads, exports functions to

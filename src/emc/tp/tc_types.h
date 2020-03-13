@@ -127,10 +127,14 @@ typedef struct {
     double finalvel;        // velocity to aim for at end of segment
     double term_vel;        // actual velocity at termination of segment
     double kink_vel;        // Temporary way to store our calculation of maximum velocity we can handle if this segment is declared tangent with the next
+    double kink_accel_reduce_prev; // How much to reduce the allowed tangential acceleration to account for the extra acceleration at an approximate tangent intersection.
+    double kink_accel_reduce; // How much to reduce the allowed tangential acceleration to account for the extra acceleration at an approximate tangent intersection.
 
     //Acceleration
     double maxaccel;        // accel calc'd by task
-    
+    double acc_ratio_tan;   // ratio between normal and tangential accel
+    double acc_normal_max;         // Max acceleration allowed in normal direction (worst-case for the whole curve)
+
     int id;                 // segment's serial number
     struct state_tag_t tag; /* state tag corresponding to running motion */
 
